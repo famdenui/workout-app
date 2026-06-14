@@ -707,6 +707,29 @@ function toggleDatePicker(){
 }
 
 function init(){
+
+  // --- データマイグレーション（旧キーwt_sessionsから新キーwt_v2へ）---
+  try{
+    const oldData = localStorage.getItem('wt_sessions');
+    const newData = localStorage.getItem('wt_v2');
+    if(oldData && !newData){
+      // 旧データをそのまま移行
+      localStorage.setItem('wt_v2', oldData);
+      localStorage.removeItem('wt_sessions');
+      console.log('migrated wt_sessions → wt_v2');
+    } else if(oldData && newData){
+      // 両方ある場合はマージ（旧データを先に追加）
+      const old = JSON.parse(oldData);
+      const newer = JSON.parse(newData);
+      const merged = [...old, ...newer].filter((s,i,arr)=>
+        arr.findIndex(t=>String(t.id)===String(s.id))===i
+      ).sort((a,b)=>new Date(a.date)-new Date(b.date));
+      localStorage.setItem('wt_v2', JSON.stringify(merged));
+      localStorage.removeItem('wt_sessions');
+      console.log('merged wt_sessions + wt_v2');
+    }
+  }catch(e){ console.warn('migration error', e); }
+
   // GYMSをlocalStorageから読み込む
   GYMS = loadGyms();
   // GYMSにiconを付与
