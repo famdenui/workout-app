@@ -547,8 +547,117 @@ let timerExIdx = -1;
 let timerSetIdx = -1;
 let currentFilter = 'all';
 
-function getDB(){ try{ return JSON.parse(localStorage.getItem('wt_v2')||'[]'); }catch(e){ return []; }}
-function setDB(d){ localStorage.setItem('wt_v2', JSON.stringify(d)); }
+
+// --- SUPABASE CONFIG ---
+const SUPABASE_URL = 'https://zttzdfdpnpzvtkevhjid.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0dHpkZmRwbnB6dnRrZXZoamlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzQyNTAsImV4cCI6MjA5NzAxMDI1MH0.ry3bhv3hx4uwasYfInbYI0qSX5Vu0m1cXsE6LPh9Lkc';
+
+function sbHeaders(){
+  return {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Prefer': 'return=minimal'
+  };
+}
+
+// DB読み込み（Supabase優先、fallbackでlocalStorage）
+async function getDB(){
+  try{
+    const res = await fetch(SUPABASE_URL+'/rest/v1/sessions?select=*&order=date.asc', {
+      headers: sbHeaders()
+    });
+    if(!res.ok) throw new Error('fetch failed');
+    const rows = await res.json();
+    return rows.map(r=>({
+      id: r.id,
+      date: r.date,
+      gym: r.gym,
+      exercises: r.exercises
+    }));
+  } catch(e){
+    console.warn('Supabase read failed, using localStorage', e);
+    try{ return JSON.parse(localStorage.getItem('wt_v2')||'[]'); }catch(e2){ return []; }
+  }
+}
+
+// DB保存（Supabase + localStorageバックアップ）
+async function saveSession(session){
+  // localStorageバックアップ
+  try{
+    const local = JSON.parse(localStorage.getItem('wt_v2')||'[]');
+    local.push(session);
+    localStorage.setItem('wt_v2', JSON.stringify(local));
+  }catch(e){}
+
+  // Supabaseに保存
+  try{
+    const res = await fetch(SUPABASE_URL+'/rest/v1/sessions', {
+      method: 'POST',
+      headers: {...sbHeaders(), 'Prefer': 'return=minimal'},
+      body: JSON.stringify({
+        id: session.id,
+        date: session.date,
+        gym: session.gym,
+        exercises: session.exercises
+      })
+    });
+    if(!res.ok){
+      const err = await res.text();
+      throw new Error(err);
+    }
+    return true;
+  } catch(e){
+    console.warn('Supabase save failed', e);
+    return false;
+  }
+}
+
+// DB削除
+async function deleteSession(id){
+  // localStorageから削除
+  try{
+    const local = JSON.parse(localStorage.getItem('wt_v2')||'[]').filter(s=>String(s.id)!==String(id));
+    localStorage.setItem('wt_v2', JSON.stringify(local));
+  }catch(e){}
+
+  // Supabaseから削除
+  try{
+    const res = await fetch(SUPABASE_URL+'/rest/v1/sessions?id=eq.'+id, {
+      method: 'DELETE',
+      headers: sbHeaders()
+    });
+    return res.ok;
+  } catch(e){
+    console.warn('Supabase delete failed', e);
+    return false;
+  }
+}
+
+// 旧localStorageデータをSupabaseに移行
+async function migrateToSupabase(){
+  const migrated = localStorage.getItem('wt_migrated_to_supabase');
+  if(migrated) return;
+  try{
+    const local = JSON.parse(localStorage.getItem('wt_v2')||'[]');
+    if(!local.length) { localStorage.setItem('wt_migrated_to_supabase','1'); return; }
+    // 既存のSupabaseデータを取得
+    const existing = await getDB();
+    const existingIds = new Set(existing.map(s=>String(s.id)));
+    // まだSupabaseにないものだけアップロード
+    const toMigrate = local.filter(s=>!existingIds.has(String(s.id)));
+    for(const s of toMigrate){
+      await fetch(SUPABASE_URL+'/rest/v1/sessions', {
+        method: 'POST',
+        headers: {...sbHeaders(), 'Prefer': 'return=minimal'},
+        body: JSON.stringify({ id:s.id, date:s.date, gym:s.gym, exercises:s.exercises })
+      });
+    }
+    localStorage.setItem('wt_migrated_to_supabase','1');
+    if(toMigrate.length > 0) showToast(toMigrate.length+'件の履歴をクラウドに移行しました');
+  }catch(e){ console.warn('migration failed', e); }
+}
+
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtSec(s){ return Math.floor(s/60)+':'+pad(s%60); }
 function today(){ return new Date().toISOString().slice(0,10); }
@@ -743,6 +852,7 @@ function init(){
   renderDate();
   initDateUI();
   checkInstallBanner();
+  migrateToSupabase();
   renderRec();
   document.addEventListener('click', e=>{
     if(!e.target.closest('#suggestSheet') && !e.target.closest('#addInput')){
@@ -1148,10 +1258,9 @@ function closeModal(){
   document.getElementById('modal').classList.remove('on');
 }
 
-function doSave(){
+async function doSave(){
   closeModal();
-  const sessions = getDB();
-  sessions.push({
+  const session = {
     id: Date.now(),
     date: selectedDate,
     gym: currentGym,
@@ -1159,20 +1268,20 @@ function doSave(){
       name: e.name,
       sets: e.sets.map(s=>({weight:s.weight, reps:s.reps}))
     }))
-  });
-  setDB(sessions);
+  };
+  const ok = await saveSession(session);
   exercises = [];
   selectedDate = today();
   updateDateDisplay();
   renderRec();
-  showToast('保存しました！');
+  showToast(ok ? '保存しました！' : '保存しました（オフライン）');
   showScreen('dash', document.getElementById('nav-dash'));
   renderDash();
 }
 
 // --- DASHBOARD ---
-function renderDash(){
-  const all = getDB();
+async function renderDash(){
+  const all = await getDB();
   const now = new Date();
   const oneMonthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
   const recent = all.filter(s=>new Date(s.date)>=oneMonthAgo);
@@ -1419,8 +1528,8 @@ ${bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+': '+b.sets+'セッ
 }
 
 // --- HISTORY ---
-function renderHist(){
-  const all = getDB().slice().reverse();
+async function renderHist(){
+  const all = (await getDB()).slice().reverse();
   document.getElementById('histSub').textContent = all.length+'回のトレーニング';
   const el = document.getElementById('histList');
   if(!all.length){
@@ -1580,10 +1689,9 @@ function closeDelete(){
   deleteTargetId = null;
 }
 
-function doDelete(){
+async function doDelete(){
   if(!deleteTargetId) return;
-  const sessions = getDB().filter(s=>String(s.id)!==String(deleteTargetId));
-  setDB(sessions);
+  await deleteSession(deleteTargetId);
   closeDelete();
   renderHist();
   showToast('削除しました');
