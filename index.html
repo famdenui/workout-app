@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>トレーニング</title>
 
 <style>
@@ -16,9 +16,17 @@
   --radius:13px;--radius-sm:10px;--radius-xs:7px;
   --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;overscroll-behavior:none}
 body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100dvh;overflow:hidden;position:relative}
+
+
+/* DATE PICKER */
+.date-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.date-toggle{font-size:12px;color:var(--accent);font-weight:500;cursor:pointer;padding:2px 0;border:none;background:none;font-family:var(--font)}
+.date-input{background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-xs);padding:6px 10px;font-size:15px;color:var(--text);font-family:var(--font);outline:none;cursor:pointer;flex:1}
+.date-input:focus{border-color:var(--accent)}
+.date-label{font-size:12px;color:var(--text3);margin-right:4px}
 
 /* NAV */
 .nav{display:flex;background:var(--surface);border-top:0.5px solid var(--border2);padding:6px 0 max(10px,env(safe-area-inset-bottom));flex-shrink:0;z-index:100}
@@ -80,8 +88,8 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 /* SET ROW */
 .set-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .set-num{font-size:10px;color:var(--text5);width:14px;text-align:center;font-family:var(--mono);flex-shrink:0}
-.num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:4px 6px;gap:4px}
-.num-ctrl-btn{width:22px;height:22px;border:none;background:none;color:var(--text4);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;border-radius:4px;flex-shrink:0;line-height:1}
+.num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:4px 4px;gap:2px}
+.num-ctrl-btn{width:36px;height:36px;border:none;background:none;color:var(--text4);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-val{font-size:12px;font-weight:500;color:var(--text);min-width:36px;text-align:center;font-family:var(--mono)}
 .done-btn{font-size:11px;padding:5px 11px;border-radius:99px;border:0.5px solid var(--border);background:var(--surface);color:var(--text4);cursor:pointer;margin-left:auto;white-space:nowrap;font-family:var(--font);transition:all 0.15s;flex-shrink:0}
@@ -108,18 +116,18 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .timer-ctx{font-size:12px;color:var(--text3)}
 .timer-skip{font-size:13px;color:var(--accent);font-weight:500;cursor:pointer;padding:4px 0}
 .timer-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0}
-.timer-label{font-size:10px;color:var(--text3);letter-spacing:0.12em;margin-bottom:20px}
-.ring-container{position:relative;width:200px;height:200px;margin-bottom:24px}
+.timer-label{font-size:12px;color:var(--text3);letter-spacing:0.14em;margin-bottom:16px}
+.ring-container{position:relative;width:260px;height:260px;margin-bottom:20px}
 .ring-container svg{position:absolute;inset:0;width:100%;height:100%}
 .ring-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.ring-time{font-size:52px;font-weight:200;color:var(--text);letter-spacing:-3px;font-family:var(--mono);line-height:1}
-.ring-sub{font-size:11px;color:var(--text4);letter-spacing:0.05em;margin-top:6px}
+.ring-time{font-size:68px;font-weight:200;color:var(--text);letter-spacing:-4px;font-family:var(--mono);line-height:1}
+.ring-sub{font-size:13px;color:var(--text4);letter-spacing:0.05em;margin-top:8px}
 .ring-time.urgent{color:var(--red)}
 .ring-time.done{color:var(--green)}
 .timer-next-wrap{text-align:center}
 .timer-next-lbl{font-size:11px;color:var(--text3);margin-bottom:5px}
-.timer-next-ex{font-size:15px;font-weight:500;color:var(--text)}
-.timer-next-set{font-size:13px;color:var(--accent);margin-top:3px;font-family:var(--mono)}
+.timer-next-ex{font-size:17px;font-weight:500;color:var(--text)}
+.timer-next-set{font-size:15px;color:var(--accent);margin-top:4px;font-family:var(--mono)}
 .timer-bottom{display:flex;flex-direction:column;gap:10px}
 .seg-group{width:100%}
 .segs{display:flex;gap:4px}
@@ -129,7 +137,7 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .seg-info{display:flex;justify-content:space-between;margin-top:5px}
 .seg-lbl{font-size:10px;color:var(--text4)}
 .adj-row{display:flex;gap:8px;justify-content:center}
-.adj-btn{font-size:13px;padding:9px 18px;border-radius:99px;color:var(--text2);background:var(--surface);border:0.5px solid var(--border);cursor:pointer;font-family:var(--font);font-weight:500;transition:all 0.15s}
+.adj-btn{font-size:14px;padding:11px 20px;border-radius:99px;color:var(--text2);background:var(--surface);border:0.5px solid var(--border);cursor:pointer;font-family:var(--font);font-weight:500;transition:all 0.15s;touch-action:manipulation}
 .adj-btn:active{background:var(--bg)}
 .adj-btn.reset{color:var(--text4)}
 
@@ -289,6 +297,12 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
   <div class="screen on" id="screen-rec">
     <div class="page-title">今日</div>
     <div class="page-sub" id="recSub">—</div>
+    <div class="date-row" id="dateRow">
+      <span class="date-label">日付</span>
+      <input class="date-input" type="date" id="dateInput" style="display:none">
+      <span id="dateCurrent" style="font-size:13px;color:var(--text);font-weight:500"></span>
+      <button class="date-toggle" id="dateToggleBtn" onclick="toggleDatePicker()">過去の日付を入力</button>
+    </div>
     <div class="gym-chips" id="gymChips"></div>
     <div class="add-input-wrap">
       <input class="add-input" id="addInput" placeholder="種目を追加..." autocomplete="off"
@@ -425,9 +439,55 @@ function gymLabel(id){ const g=GYMS.find(g=>g.id===id); return g?g.label:id; }
 function gymBadge(id){ const g=GYMS.find(g=>g.id===id); if(!g) return id; return '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">'+g.icon+'</span>'+g.label+'</span>'; }
 
 // --- INIT ---
+
+// --- DATE ---
+let selectedDate = today();
+
+function initDateUI(){
+  const inp = document.getElementById('dateInput');
+  const cur = document.getElementById('dateCurrent');
+  inp.value = selectedDate;
+  inp.max = today();
+  updateDateDisplay();
+  inp.addEventListener('change', e=>{
+    selectedDate = e.target.value || today();
+    updateDateDisplay();
+  });
+}
+
+function updateDateDisplay(){
+  const cur = document.getElementById('dateCurrent');
+  const btn = document.getElementById('dateToggleBtn');
+  const inp = document.getElementById('dateInput');
+  if(selectedDate === today()){
+    cur.textContent = '';
+    btn.textContent = '過去の日付を入力';
+    inp.style.display = 'none';
+  } else {
+    const d = new Date(selectedDate);
+    const days=['日','月','火','水','木','金','土'];
+    cur.textContent = (d.getMonth()+1)+'月'+d.getDate()+'日（'+days[d.getDay()]+'）';
+    btn.textContent = 'リセット';
+    inp.style.display = 'none';
+  }
+}
+
+function toggleDatePicker(){
+  const inp = document.getElementById('dateInput');
+  const btn = document.getElementById('dateToggleBtn');
+  if(btn.textContent === 'リセット'){
+    selectedDate = today();
+    updateDateDisplay();
+    return;
+  }
+  inp.style.display = inp.style.display==='none' ? 'block' : 'none';
+  if(inp.style.display === 'block') inp.focus();
+}
+
 function init(){
   renderGymChips();
   renderDate();
+  initDateUI();
   renderRec();
   document.addEventListener('click', e=>{
     if(!e.target.closest('#suggestSheet') && !e.target.closest('#addInput')){
@@ -762,7 +822,7 @@ function doSave(){
   const sessions = getDB();
   sessions.push({
     id: Date.now(),
-    date: today(),
+    date: selectedDate,
     gym: currentGym,
     exercises: exercises.map(e=>({
       name: e.name,
@@ -771,6 +831,8 @@ function doSave(){
   });
   setDB(sessions);
   exercises = [];
+  selectedDate = today();
+  updateDateDisplay();
   renderRec();
   showToast('保存しました！');
   showScreen('dash', document.getElementById('nav-dash'));
