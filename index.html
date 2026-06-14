@@ -503,6 +503,18 @@ document.head.appendChild(link);
   </div>
 </div>
 
+
+<!-- CATEGORY MODAL -->
+<div class="new-ex-overlay" id="catOverlay">
+  <div class="new-ex-sheet">
+    <div class="new-ex-title" id="catModalTitle">部位を設定</div>
+    <div class="cat-label">このアイコンの色が変わります</div>
+    <div class="cat-grid" id="catOnlyGrid"></div>
+    <button class="new-ex-add" onclick="confirmCat()">設定する</button>
+    <button class="new-ex-cancel" onclick="closeCatModal()">キャンセル</button>
+  </div>
+</div>
+
 <!-- DELETE CONFIRM -->
 <div class="delete-confirm" id="deleteConfirm">
   <div class="delete-sheet">
@@ -590,23 +602,27 @@ function sbHeaders(){
   };
 }
 
-// DB読み込み（Supabase優先、fallbackでlocalStorage）
-async function getDB(){
+// DB読み込み：localStorageから即時返す（同期）
+function getDB(){
+  try{ return JSON.parse(localStorage.getItem('wt_v2')||'[]'); }catch(e){ return []; }
+}
+
+// Supabaseからデータを取得してlocalStorageに同期
+async function syncFromSupabase(){
   try{
     const res = await fetch(SUPABASE_URL+'/rest/v1/sessions?select=*&order=date.asc', {
       headers: sbHeaders()
     });
     if(!res.ok) throw new Error('fetch failed');
     const rows = await res.json();
-    return rows.map(r=>({
-      id: r.id,
-      date: r.date,
-      gym: r.gym,
-      exercises: r.exercises
+    const sessions = rows.map(r=>({
+      id: r.id, date: r.date, gym: r.gym, exercises: r.exercises
     }));
+    localStorage.setItem('wt_v2', JSON.stringify(sessions));
+    return sessions;
   } catch(e){
-    console.warn('Supabase read failed, using localStorage', e);
-    try{ return JSON.parse(localStorage.getItem('wt_v2')||'[]'); }catch(e2){ return []; }
+    console.warn('Supabase sync failed', e);
+    return null;
   }
 }
 
@@ -882,6 +898,15 @@ function init(){
   initDateUI();
   checkInstallBanner();
   migrateToSupabase();
+  // バックグラウンドでSupabaseと同期
+  syncFromSupabase().then(data=>{
+    if(data){
+      // 同期完了後に画面を更新
+      const activeScreen = document.querySelector('.screen.on')?.id;
+      if(activeScreen==='screen-dash') renderDash();
+      if(activeScreen==='screen-hist') renderHist();
+    }
+  });
   renderRec();
   document.addEventListener('click', e=>{
     if(!e.target.closest('#suggestSheet') && !e.target.closest('#addInput')){
@@ -935,8 +960,15 @@ function filterSuggest(){
 
   const prevData = getPrevData();
   const sheet = document.getElementById('suggestSheet');
+  // itemsもotherもなくvalも空の場合でも「新しい種目」は常に表示
   if(!items.length && !other.length && !val){
-    sheet.classList.remove('on'); return;
+    // 「新しい種目を入力」だけ表示
+    const sheet = document.getElementById('suggestSheet');
+    sheet.innerHTML = `<div class="suggest-new" onclick="addCustomExercise()">
+      <span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5-10.5a2.121 2.121 0 0 0-3-3L5 17v3z"/></svg></span><span>新しい種目を入力...</span>
+    </div>`;
+    sheet.classList.add('on');
+    return;
   }
 
   const renderItem = (name,gymId)=>{
@@ -986,7 +1018,8 @@ function addCustomExercise(){
 }
 
 function getPrevData(){
-  const sessions = getDB().filter(s=>s.gym===currentGym);
+  const all = getDB();
+  const sessions = all.filter(s=>s.gym===currentGym);
   const result = {};
   for(let i=sessions.length-1;i>=0;i--){
     for(const ex of sessions[i].exercises){
@@ -998,7 +1031,8 @@ function getPrevData(){
 }
 
 function getPrevSets(name){
-  const sessions = getDB().filter(s=>s.gym===currentGym);
+  const all = getDB();
+  const sessions = all.filter(s=>s.gym===currentGym);
   for(let i=sessions.length-1;i>=0;i--){
     const ex = sessions[i].exercises.find(e=>e.name===name);
     if(ex && ex.sets.length) return ex.sets;
@@ -1020,9 +1054,9 @@ async function addExerciseByName(name){
   hideSuggest();
   renderRec();
   setTimeout(()=>{
-    const el = document.querySelector('.ex-card:last-of-type');
-    if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
-  }, 100);
+    const screen = document.getElementById('screen-rec');
+    if(screen) screen.scrollTo({top:0, behavior:'smooth'});
+  }, 50);
   // プリセットにない種目はAIでカテゴリ判定（バックグラウンド）
   if(!EXERCISE_ICONS[name]){
     detectExerciseCategory(name).then(()=>{
@@ -1310,7 +1344,7 @@ async function doSave(){
 
 // --- DASHBOARD ---
 async function renderDash(){
-  const all = await getDB();
+  const all = getDB();
   const now = new Date();
   const oneMonthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
   const recent = all.filter(s=>new Date(s.date)>=oneMonthAgo);
@@ -1560,7 +1594,7 @@ ${bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+': '+b.sets+'セッ
 
 // --- HISTORY ---
 async function renderHist(){
-  const all = (await getDB()).slice().reverse();
+  const all = getDB().slice().reverse();
   document.getElementById('histSub').textContent = all.length+'回のトレーニング';
   const el = document.getElementById('histList');
   if(!all.length){
@@ -1748,7 +1782,7 @@ function selectCat(key){
   renderCatGrid();
 }
 
-function confirmNewExercise(){
+async function confirmNewExercise(){
   const name = document.getElementById('newExInput').value.trim();
   if(!name){ showToast('種目名を入力してください'); return; }
   // カテゴリをキャッシュに保存
@@ -1759,7 +1793,53 @@ function confirmNewExercise(){
     localStorage.setItem('wt_categories', JSON.stringify(saved));
   }catch(e){}
   closeNewExerciseModal();
-  addExerciseByName(name);
+  await addExerciseByName(name);
+}
+
+
+// --- CATEGORY MODAL ---
+let catTargetName = null;
+let catSelected = 'default';
+
+function openCatModal(name){
+  catTargetName = name;
+  catSelected = getExerciseCategorySync(name);
+  document.getElementById('catModalTitle').textContent = name + ' の部位';
+  renderCatOnlyGrid();
+  document.getElementById('catOverlay').classList.add('on');
+}
+
+function closeCatModal(){
+  document.getElementById('catOverlay').classList.remove('on');
+  catTargetName = null;
+}
+
+function renderCatOnlyGrid(){
+  const grid = document.getElementById('catOnlyGrid');
+  grid.innerHTML = CAT_OPTIONS.map(c=>`
+    <div class="cat-btn${c.key===catSelected?' on':''}"
+      style="${c.key===catSelected?'background:'+c.color+';color:#fff;border-color:'+c.color+';':''}"
+      onclick="selectCatOnly('${c.key}')">
+      ${c.label}
+    </div>`).join('');
+}
+
+function selectCatOnly(key){
+  catSelected = key;
+  renderCatOnlyGrid();
+}
+
+function confirmCat(){
+  if(!catTargetName) return;
+  customExerciseCategories[catTargetName] = catSelected;
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+    saved[catTargetName] = catSelected;
+    localStorage.setItem('wt_categories', JSON.stringify(saved));
+  }catch(e){}
+  closeCatModal();
+  renderRec();
+  showToast('部位を設定しました');
 }
 
 // --- DELETE ---
@@ -1793,8 +1873,8 @@ function showScreen(id, btn){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
   document.getElementById('screen-'+id).classList.add('on');
   btn.classList.add('on');
-  if(id==='dash') renderDash();
-  if(id==='hist') renderHist();
+  if(id==='dash'){ syncFromSupabase().then(()=>renderDash()); renderDash(); }
+  if(id==='hist'){ syncFromSupabase().then(()=>renderHist()); renderHist(); }
   if(id==='settings') renderGymSettings();
 }
 
