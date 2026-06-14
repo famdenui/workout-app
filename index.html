@@ -21,6 +21,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100dvh;overflow:hidden;position:relative}
 
 
+
+
+/* DELETE */
+.hist-del{font-size:11px;color:var(--red);padding:4px 8px;border:0.5px solid rgba(255,59,48,0.3);border-radius:99px;background:none;cursor:pointer;font-family:var(--font);margin-top:8px;display:block;width:100%;touch-action:manipulation}
+.hist-del:active{background:rgba(255,59,48,0.08)}
+.delete-confirm{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:260;display:none;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom)}
+.delete-confirm.on{display:flex}
+.delete-sheet{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px max(20px,env(safe-area-inset-bottom));width:100%;max-width:430px}
+.delete-sheet h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.delete-sheet p{font-size:13px;color:var(--text3);margin-bottom:18px;line-height:1.6}
+.delete-btn-red{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff;margin-bottom:8px;touch-action:manipulation}
+.delete-btn-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
+
+/* DRUM ROLLER */
+.drum-wrap{display:flex;align-items:center;gap:2px;background:var(--bg);border-radius:var(--radius-xs);padding:4px 8px;cursor:ns-resize;user-select:none;-webkit-user-select:none;touch-action:none;min-width:64px;justify-content:center;position:relative}
+.drum-val{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono);text-align:center;min-width:44px;transition:transform 0.08s,opacity 0.08s}
+.drum-unit{font-size:11px;color:var(--text4);margin-left:1px}
+.drum-hint{font-size:9px;color:var(--text5);position:absolute;right:4px;top:50%;transform:translateY(-50%);pointer-events:none}
+
 /* DATE PICKER */
 .date-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .date-toggle{font-size:12px;color:var(--accent);font-weight:500;cursor:pointer;padding:2px 0;border:none;background:none;font-family:var(--font)}
@@ -369,6 +388,17 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
   </div>
 </div>
 
+
+<!-- DELETE CONFIRM -->
+<div class="delete-confirm" id="deleteConfirm">
+  <div class="delete-sheet">
+    <h3>このトレーニングを削除しますか？</h3>
+    <p id="deleteDesc">—</p>
+    <button class="delete-btn-red" onclick="doDelete()">削除する</button>
+    <button class="delete-btn-cancel" onclick="closeDelete()">キャンセル</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -439,6 +469,54 @@ function gymLabel(id){ const g=GYMS.find(g=>g.id===id); return g?g.label:id; }
 function gymBadge(id){ const g=GYMS.find(g=>g.id===id); if(!g) return id; return '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">'+g.icon+'</span>'+g.label+'</span>'; }
 
 // --- INIT ---
+
+
+// --- DRUM ROLLER ---
+function initDrum(el, getVal, setVal, step, fmt){
+  let startY = 0, lastY = 0, dragging = false, accDelta = 0;
+
+  function onStart(e){
+    dragging = true;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    lastY = startY;
+    accDelta = 0;
+    el.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!dragging) return;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    const dy = lastY - y;
+    lastY = y;
+    accDelta += dy;
+    const threshold = 6;
+    if(Math.abs(accDelta) >= threshold){
+      const steps = Math.round(accDelta / threshold);
+      const newVal = Math.max(step, Math.round((getVal() + steps * step) / step) * step);
+      if(newVal !== getVal()){
+        setVal(newVal);
+        // アニメ
+        const vEl = el.querySelector('.drum-val');
+        vEl.style.transform = steps>0?'translateY(-4px)':'translateY(4px)';
+        vEl.style.opacity = '0.6';
+        setTimeout(()=>{ vEl.style.transform=''; vEl.style.opacity=''; },80);
+      }
+      accDelta = accDelta % threshold;
+    }
+    e.preventDefault();
+  }
+  function onEnd(){
+    dragging = false;
+    el.style.cursor = 'ns-resize';
+  }
+
+  el.addEventListener('touchstart', onStart, {passive:false});
+  el.addEventListener('touchmove', onMove, {passive:false});
+  el.addEventListener('touchend', onEnd);
+  el.addEventListener('mousedown', onStart);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+}
 
 // --- DATE ---
 let selectedDate = today();
@@ -686,15 +764,11 @@ function renderRec(){
     const setsHtml = ex.sets.map((s,si)=>`
       <div class="set-row">
         <div class="set-num">${si+1}</div>
-        <div class="num-ctrl">
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
-          <div class="num-val">${s.weight}kg</div>
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
+        <div class="drum-wrap" id="drum-w-${ei}-${si}" data-ei="${ei}" data-si="${si}" data-field="weight">
+          <div class="drum-val">${s.weight}kg</div>
         </div>
-        <div class="num-ctrl">
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
-          <div class="num-val">${s.reps}回</div>
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
+        <div class="drum-wrap" id="drum-r-${ei}-${si}" data-ei="${ei}" data-si="${si}" data-field="reps">
+          <div class="drum-val">${s.reps}回</div>
         </div>
         ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
         <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">${s.done?'✓ 完了':'完了'}</button>
@@ -716,6 +790,25 @@ function renderRec(){
         </button>
       </div>`;
   }).join('');
+  // ドラムロール初期化
+  setTimeout(()=>{
+    document.querySelectorAll('.drum-wrap').forEach(el=>{
+      const ei = parseInt(el.dataset.ei);
+      const si = parseInt(el.dataset.si);
+      const field = el.dataset.field;
+      const step = field==='weight' ? 0.5 : 1;
+      initDrum(
+        el,
+        ()=>exercises[ei].sets[si][field],
+        (v)=>{
+          exercises[ei].sets[si][field] = v;
+          exercises[ei].sets[si].preset = false;
+          el.querySelector('.drum-val').textContent = field==='weight' ? v+'kg' : v+'回';
+        },
+        step
+      );
+    });
+  }, 50);
 }
 
 // --- TIMER ---
@@ -1071,13 +1164,42 @@ function renderHist(){
           </div>
         </div>
         <div class="hist-tags">${tags}${more}</div>
-        <div class="hist-detail">${detail}</div>
+        <div class="hist-detail">${detail}
+          <button class="hist-del" onclick="event.stopPropagation();confirmDelete('${s.id}','${s.date}','${gym?.label||s.gym}',${s.exercises.length})">このトレーニングを削除</button>
+        </div>
       </div>`;
   }).join('');
 }
 
 function toggleDetail(el){
   el.querySelector('.hist-detail').classList.toggle('on');
+}
+
+
+// --- DELETE ---
+let deleteTargetId = null;
+
+function confirmDelete(id, date, gym, exCount){
+  deleteTargetId = id;
+  const d = new Date(date);
+  const days=['日','月','火','水','木','金','土'];
+  document.getElementById('deleteDesc').textContent =
+    (d.getMonth()+1)+'月'+d.getDate()+'日（'+days[d.getDay()]+'）'+gym+' · '+exCount+'種目';
+  document.getElementById('deleteConfirm').classList.add('on');
+}
+
+function closeDelete(){
+  document.getElementById('deleteConfirm').classList.remove('on');
+  deleteTargetId = null;
+}
+
+function doDelete(){
+  if(!deleteTargetId) return;
+  const sessions = getDB().filter(s=>String(s.id)!==String(deleteTargetId));
+  setDB(sessions);
+  closeDelete();
+  renderHist();
+  showToast('削除しました');
 }
 
 // --- SCREEN NAV ---
