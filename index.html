@@ -35,7 +35,7 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .delete-btn-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
 
 /* NUM INPUT */
-.num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:3px 4px;gap:2px}
+.num-ctrl{display:flex;align-items:center;background:var(--surface);border-radius:var(--radius-xs);padding:3px 4px;gap:2px}
 .num-ctrl-btn{width:34px;height:34px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:7px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-direct{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono);text-align:center;min-width:52px;background:none;border:none;outline:none;cursor:pointer;padding:4px 2px;border-radius:6px;touch-action:manipulation}
@@ -94,7 +94,7 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .suggest-new span{font-size:12px}
 
 /* EXERCISE CARD */
-.ex-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:11px 12px;margin-bottom:8px;transition:border-color 0.2s}
+.ex-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:11px 12px 8px;margin-bottom:8px;transition:border-color 0.2s}
 .ex-card.active{border-color:rgba(94,92,230,0.3);background:#fafaff}
 .ex-head{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .ex-ico{width:28px;height:28px;border-radius:8px;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -106,13 +106,15 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .ex-del:hover{background:var(--bg);color:var(--text3)}
 
 /* SET ROW */
-.set-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.set-row{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;background:var(--bg);border-radius:10px;padding:8px 10px}
+.set-row-top{display:flex;align-items:center;gap:6px}
+.set-row-bottom{display:flex;align-items:center;gap:6px;padding-left:20px}
 .set-num{font-size:10px;color:var(--text5);width:14px;text-align:center;font-family:var(--mono);flex-shrink:0}
 .num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:4px 4px;gap:2px}
 .num-ctrl-btn{width:36px;height:36px;border:none;background:none;color:var(--text4);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-val{font-size:12px;font-weight:500;color:var(--text);min-width:36px;text-align:center;font-family:var(--mono)}
-.done-btn{font-size:11px;padding:5px 11px;border-radius:99px;border:0.5px solid var(--border);background:var(--surface);color:var(--text4);cursor:pointer;margin-left:auto;white-space:nowrap;font-family:var(--font);transition:all 0.15s;flex-shrink:0}
+.done-btn{font-size:12px;padding:8px 0;border-radius:8px;border:0.5px solid var(--border);background:var(--surface);color:var(--text4);cursor:pointer;white-space:nowrap;font-family:var(--font);transition:all 0.15s;flex:1;text-align:center;touch-action:manipulation}
 .done-btn.on{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
 .preset-tag{font-size:9px;color:var(--text5);background:var(--bg);padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0}
 .add-set-btn{display:flex;align-items:center;gap:5px;padding:5px 2px;margin-top:2px;cursor:pointer;color:var(--text4);border:none;background:none;font-family:var(--font)}
@@ -747,25 +749,29 @@ function renderRec(){
 
     const setsHtml = ex.sets.map((s,si)=>`
       <div class="set-row">
-        <div class="set-num">${si+1}</div>
-        <div class="num-ctrl">
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
-          <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
-            onchange="setVal(${ei},${si},'weight',this.value)"
-            onfocus="this.select()" style="width:52px">
-          <span style="font-size:11px;color:var(--text4);margin-right:2px">kg</span>
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
+        <div class="set-row-top">
+          <div class="set-num">${si+1}</div>
+          <div class="num-ctrl">
+            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
+            <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
+              onchange="setVal(${ei},${si},'weight',this.value)"
+              onfocus="this.select()" style="width:48px">
+            <span style="font-size:11px;color:var(--text4);margin-right:2px">kg</span>
+            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
+          </div>
+          <div class="num-ctrl">
+            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
+            <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
+              onchange="setVal(${ei},${si},'reps',this.value)"
+              onfocus="this.select()" style="width:34px">
+            <span style="font-size:11px;color:var(--text4);margin-right:2px">回</span>
+            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
+          </div>
+          ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
         </div>
-        <div class="num-ctrl">
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
-          <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
-            onchange="setVal(${ei},${si},'reps',this.value)"
-            onfocus="this.select()" style="width:38px">
-          <span style="font-size:11px;color:var(--text4);margin-right:2px">回</span>
-          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
+        <div class="set-row-bottom">
+          <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">${s.done?'✓ セット完了':'セット完了'}</button>
         </div>
-        ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
-        <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">${s.done?'✓ 完了':'完了'}</button>
       </div>`).join('');
 
     return `
