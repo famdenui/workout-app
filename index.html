@@ -32,6 +32,22 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 
 
+
+/* NEW EXERCISE MODAL */
+.new-ex-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:260;display:none;align-items:flex-end;justify-content:center}
+.new-ex-overlay.on{display:flex}
+.new-ex-sheet{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 20px max(20px,env(safe-area-inset-bottom));width:100%;max-width:430px}
+.new-ex-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:14px}
+.new-ex-input{width:100%;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-size:16px;color:var(--text);font-family:var(--font);outline:none;margin-bottom:12px}
+.new-ex-input:focus{border-color:var(--accent)}
+.cat-label{font-size:11px;color:var(--text3);letter-spacing:0.06em;margin-bottom:8px}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:16px}
+.cat-btn{padding:8px 4px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:11px;font-weight:500;color:var(--text2);text-align:center;touch-action:manipulation;transition:all 0.15s;font-family:var(--font)}
+.cat-btn.on{color:#fff;border-color:transparent}
+.new-ex-add{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);background:var(--accent);color:#fff;margin-bottom:8px;touch-action:manipulation}
+.new-ex-add:disabled{opacity:0.35;cursor:not-allowed}
+.new-ex-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:500;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
+
 /* INSTALL BANNER */
 .install-banner{position:fixed;bottom:0;left:0;right:0;background:#1c1c1e;color:#fff;padding:12px 16px max(16px,env(safe-area-inset-bottom));z-index:400;display:flex;align-items:center;gap:10px;font-family:var(--font);max-width:430px;margin:0 auto}
 .install-banner-text{flex:1;font-size:12px;line-height:1.5;color:rgba(255,255,255,0.85)}
@@ -473,6 +489,19 @@ document.head.appendChild(link);
   </div>
 </div>
 
+
+
+<!-- NEW EXERCISE MODAL -->
+<div class="new-ex-overlay" id="newExOverlay">
+  <div class="new-ex-sheet">
+    <div class="new-ex-title">新しい種目を追加</div>
+    <input class="new-ex-input" id="newExInput" placeholder="種目名を入力" type="text" inputmode="text">
+    <div class="cat-label">部位カテゴリを選択</div>
+    <div class="cat-grid" id="catGrid"></div>
+    <button class="new-ex-add" id="newExAddBtn" onclick="confirmNewExercise()">追加する</button>
+    <button class="new-ex-cancel" onclick="closeNewExerciseModal()">キャンセル</button>
+  </div>
+</div>
 
 <!-- DELETE CONFIRM -->
 <div class="delete-confirm" id="deleteConfirm">
@@ -987,7 +1016,7 @@ async function addExerciseByName(name){
   } else {
     sets = [{weight:20,reps:10,done:false,preset:false},{weight:20,reps:10,done:false,preset:false},{weight:20,reps:10,done:false,preset:false}];
   }
-  exercises.push({name, sets});
+  exercises.unshift({name, sets});
   hideSuggest();
   renderRec();
   setTimeout(()=>{
@@ -1368,7 +1397,9 @@ async function renderDash(){
     GYMS.map(g=>'<div class="filter-chip'+(currentFilter===g.id?' on':'')+'" onclick="setFilter(\''+g.id+'\')">'+g.label+'</div>').join('');
 
   const exMap = {};
-  for(const s of recent){
+  // 日付順にソートしてから集計
+  const recentSorted = [...recent].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  for(const s of recentSorted){
     for(const ex of s.exercises){
       const key = ex.name+'|'+s.gym;
       if(!exMap[key]) exMap[key]={name:ex.name, gym:s.gym, sessions:[]};
@@ -1670,6 +1701,65 @@ function confirmDeleteGym(idx){
   renderGymSettings();
   renderGymChips();
   showToast('削除しました');
+}
+
+
+// --- NEW EXERCISE MODAL ---
+let selectedNewCat = 'default';
+
+const CAT_OPTIONS = [
+  {key:'chest',   label:'胸',   color:'#5e5ce6'},
+  {key:'back',    label:'背中', color:'#007aff'},
+  {key:'leg',     label:'脚',   color:'#34c759'},
+  {key:'shoulder',label:'肩',   color:'#ff9500'},
+  {key:'arm',     label:'腕',   color:'#ff3b30'},
+  {key:'core',    label:'体幹', color:'#00c7be'},
+  {key:'cardio',  label:'有酸素',color:'#ff2d55'},
+  {key:'default', label:'その他',color:'#8e8e93'},
+];
+
+function openNewExerciseModal(){
+  const input = document.getElementById('addInput');
+  const val = input.value.trim();
+  document.getElementById('newExInput').value = val;
+  selectedNewCat = 'default';
+  renderCatGrid();
+  document.getElementById('newExOverlay').classList.add('on');
+  hideSuggest();
+  setTimeout(()=>document.getElementById('newExInput').focus(), 100);
+}
+
+function closeNewExerciseModal(){
+  document.getElementById('newExOverlay').classList.remove('on');
+}
+
+function renderCatGrid(){
+  const grid = document.getElementById('catGrid');
+  grid.innerHTML = CAT_OPTIONS.map(c=>`
+    <div class="cat-btn${c.key===selectedNewCat?' on':''}"
+      style="${c.key===selectedNewCat?'background:'+c.color+';':''}"
+      onclick="selectCat('${c.key}')">
+      ${c.label}
+    </div>`).join('');
+}
+
+function selectCat(key){
+  selectedNewCat = key;
+  renderCatGrid();
+}
+
+function confirmNewExercise(){
+  const name = document.getElementById('newExInput').value.trim();
+  if(!name){ showToast('種目名を入力してください'); return; }
+  // カテゴリをキャッシュに保存
+  customExerciseCategories[name] = selectedNewCat;
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+    saved[name] = selectedNewCat;
+    localStorage.setItem('wt_categories', JSON.stringify(saved));
+  }catch(e){}
+  closeNewExerciseModal();
+  addExerciseByName(name);
 }
 
 // --- DELETE ---
