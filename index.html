@@ -2,6 +2,13 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="トレーニング">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f2f2f7">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%235e5ce6'/><text y='68' x='50' text-anchor='middle' font-size='58' font-family='system-ui'>💪</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>トレーニング</title>
 
@@ -23,6 +30,13 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 
 
+
+
+/* INSTALL BANNER */
+.install-banner{position:fixed;bottom:0;left:0;right:0;background:#1c1c1e;color:#fff;padding:12px 16px max(16px,env(safe-area-inset-bottom));z-index:400;display:flex;align-items:center;gap:10px;font-family:var(--font);max-width:430px;margin:0 auto}
+.install-banner-text{flex:1;font-size:12px;line-height:1.5;color:rgba(255,255,255,0.85)}
+.install-banner-text strong{color:#fff;display:block;margin-bottom:2px;font-size:13px}
+.install-banner-close{font-size:18px;color:rgba(255,255,255,0.5);cursor:pointer;padding:4px;touch-action:manipulation;flex-shrink:0}
 
 /* SETTINGS */
 .settings-section{margin-bottom:24px}
@@ -279,6 +293,31 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .modal-btn.primary{background:var(--accent);color:#fff}
 .modal-btn.secondary{background:var(--bg);color:var(--text3)}
 </style>
+
+<script>
+// PWA manifest インライン注入
+const manifest = {
+  name: 'トレーニング',
+  short_name: 'トレーニング',
+  display: 'standalone',
+  background_color: '#f2f2f7',
+  theme_color: '#5e5ce6',
+  orientation: 'portrait',
+  start_url: './',
+  icons: [{
+    src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%235e5ce6'/><text y='68' x='50' text-anchor='middle' font-size='58' font-family='system-ui'>💪</text></svg>",
+    sizes: '192x192',
+    type: 'image/svg+xml'
+  }]
+};
+const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+const url = URL.createObjectURL(blob);
+const link = document.createElement('link');
+link.rel = 'manifest';
+link.href = url;
+document.head.appendChild(link);
+</script>
+
 </head>
 <body>
 
@@ -382,7 +421,7 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
   <!-- 伸び -->
   <div class="screen" id="screen-dash">
-    <div class="page-title">伸び</div>
+    <div class="page-title">サマリー</div>
     <div class="page-sub" id="dashSub">直近1ヶ月 · 全拠点</div>
     <div class="top-stats" id="topStats"></div>
     <div class="ai-card" id="aiCard">
@@ -412,7 +451,7 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
     <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="11" width="4" height="2" rx="1"/><rect x="18" y="11" width="4" height="2" rx="1"/><rect x="4" y="9" width="3" height="6" rx="1.5"/><rect x="17" y="9" width="3" height="6" rx="1.5"/><line x1="7" y1="12" x2="17" y2="12"/><rect x="9.5" y="10" width="5" height="4" rx="1"/></svg></span></i><span>記録</span>
   </button>
   <button class="nav-btn" id="nav-dash" onclick="showScreen('dash',this)">
-    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 9 12 13 16 19 8"/><line x1="4" y1="20" x2="20" y2="20"/></svg></span></i><span>伸び</span>
+    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 9 12 13 16 19 8"/><line x1="4" y1="20" x2="20" y2="20"/></svg></span></i><span>サマリー</span>
   </button>
   <button class="nav-btn" id="nav-hist" onclick="showScreen('hist',this)">
     <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg></span><span>履歴</span>
@@ -443,6 +482,17 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
     <button class="delete-btn-red" onclick="doDelete()">削除する</button>
     <button class="delete-btn-cancel" onclick="closeDelete()">キャンセル</button>
   </div>
+</div>
+
+
+<!-- INSTALL BANNER -->
+<div class="install-banner" id="installBanner" style="display:none">
+  <div style="font-size:24px;flex-shrink:0">📲</div>
+  <div class="install-banner-text">
+    <strong>ホーム画面に追加すると全画面で使えます</strong>
+    Safari下部の共有ボタン →「ホーム画面に追加」
+  </div>
+  <div class="install-banner-close" onclick="dismissBanner()">×</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -522,6 +572,36 @@ function gymBadge(id){ const g=GYMS.find(g=>g.id===id); if(!g) return id; return
 
 
 
+
+// --- CATEGORY COLORS ---
+const CATEGORY_COLORS = {
+  chest:    '#5e5ce6',
+  back:     '#007aff',
+  leg:      '#34c759',
+  shoulder: '#ff9500',
+  arm:      '#ff3b30',
+  core:     '#00c7be',
+  cardio:   '#ff2d55',
+  default:  '#8e8e93',
+};
+const EXERCISE_CATEGORY_PRESET = {
+  'チェストプレス':'chest','ペックフライ':'chest','インクラインベンチプレス':'chest',
+  'ラットプルダウン':'back','ダイバージングシーテッドロウ':'back','ダイバージングローロウ':'back',
+  'ワンハンドローイング':'back','ロー リアデルトイド':'back',
+  'ショルダープレス':'shoulder','ラテラルレイズ':'shoulder','リアデルト':'shoulder',
+  'レッグプレス':'leg','シーテッドレッグプレス':'leg','レッグカール':'leg',
+  'シーテッドレッグカール':'leg','プローンレッグカール':'leg','レッグエクステンション':'leg',
+  'ヒップアブダクター':'leg',
+  'アブドミナル':'core','ロータリートルソー':'core','トーソローテーション':'core',
+  'スミスマシン':'default',
+};
+function getExerciseCategorySync(name){
+  if(EXERCISE_CATEGORY_PRESET[name]) return EXERCISE_CATEGORY_PRESET[name];
+  return customExerciseCategories[name] ||
+    (()=>{ try{ return JSON.parse(localStorage.getItem('wt_categories')||'{}')[name]; }catch(e){} })() ||
+    'default';
+}
+
 // --- EXERCISE CATEGORY ICONS ---
 const CATEGORY_ICONS = {
   chest: `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="10" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="10" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="5" y="12" width="14" height="1.5" rx="0.75" fill="#a5a3f0"/><ellipse cx="9" cy="12" rx="2.5" ry="3" fill="#5e5ce6" opacity="0.55"/><ellipse cx="15" cy="12" rx="2.5" ry="3" fill="#5e5ce6" opacity="0.55"/></svg>`,
@@ -570,6 +650,16 @@ async function detectExerciseCategory(name){
 
 function getIconByCategory(cat){
   return CATEGORY_ICONS[cat] || CATEGORY_ICONS.default;
+}
+function getIconWithColor(name){
+  const cat = getExerciseCategorySync(name);
+  const color = CATEGORY_COLORS[cat] || CATEGORY_COLORS.default;
+  const lightColor = color + '20';
+  const icon = (EXERCISE_ICONS[name] || getIconByCategory(cat))
+    .replace(/fill="#5e5ce6"/g, 'fill="'+color+'"')
+    .replace(/fill="#a5a3f0"/g, 'fill="'+color+'88"')
+    .replace(/stroke="#5e5ce6"/g, 'stroke="'+color+'"');
+  return { icon, color, lightColor, cat };
 }
 
 // --- DATE ---
@@ -629,6 +719,7 @@ function init(){
   renderGymChips();
   renderDate();
   initDateUI();
+  checkInstallBanner();
   renderRec();
   document.addEventListener('click', e=>{
     if(!e.target.closest('#suggestSheet') && !e.target.closest('#addInput')){
@@ -691,7 +782,7 @@ function filterSuggest(){
     const prevStr = prev ? prev.map(s=>s.weight+'×'+s.reps).join(' · ') : '記録なし';
     const gymTag = gymId ? `<span style="font-size:9px;color:var(--text4);margin-left:4px">${GYMS.find(g=>g.id===gymId)?.label||''}</span>` : '';
     return `<div class="suggest-item" onclick="addExerciseFromSuggest('${name}')">
-      <div class="suggest-ico">${getIcon(name)}</div>
+      <div class="suggest-ico" style="background:${ getIconWithColor(name).lightColor }">${ getIconWithColor(name).icon }</div>
       <div class="suggest-info">
         <div class="suggest-name">${name}${gymTag}</div>
         <div class="suggest-prev">${prevStr}</div>
@@ -919,7 +1010,7 @@ function renderRec(){
     return `
       <div class="ex-card${anyDone&&!allDone?' active':''}">
         <div class="ex-head">
-          <div class="ex-ico">${getIcon(ex.name)}</div>
+          <div class="ex-ico" style="background:${ getIconWithColor(ex.name).lightColor }">${ getIconWithColor(ex.name).icon }</div>
           <div class="ex-meta">
             <div class="ex-name">${ex.name}</div>
             <div class="ex-prev">${prevStr}</div>
@@ -1059,129 +1150,172 @@ function doSave(){
 // --- DASHBOARD ---
 function renderDash(){
   const all = getDB();
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth()-1);
+  const now = new Date();
+  const oneMonthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
   const recent = all.filter(s=>new Date(s.date)>=oneMonthAgo);
 
-  // top stats
   const total = recent.length;
+  let totalVol = 0;
+  recent.forEach(s=>s.exercises.forEach(e=>e.sets.forEach(st=>{ totalVol += st.weight*st.reps; })));
+  const daysInMonth = now.getDate();
+  const pace = total > 0 ? (daysInMonth / total).toFixed(1) : '—';
+  const lastSession = all.length > 0 ? all[all.length-1] : null;
+  let daysSince = '—';
+  if(lastSession){
+    const diff = Math.floor((now - new Date(lastSession.date)) / (1000*60*60*24));
+    daysSince = diff;
+  }
+  const daysSinceColor = daysSince==='—'?'#aeaeb2':daysSince<=3?'#34c759':daysSince<=5?'#ff9500':'#ff3b30';
+  const daysSinceLabel = daysSince==='—'?'記録なし':daysSince<=3?'良好':daysSince<=5?'やや空き気味':'要注意';
+  const volStr = totalVol>=1000 ? (totalVol/1000).toFixed(1)+'<span class="stat-unit">t</span>' : totalVol+'<span class="stat-unit">kg</span>';
+  const paceWeekly = total>0 && pace!=='—' ? '週'+(7/parseFloat(pace)).toFixed(1)+'回' : '記録なし';
+
+  document.getElementById('topStats').innerHTML =
+    '<div class="stat-card" style="background:#f5f4ff;border-color:rgba(94,92,230,0.15)">'+
+      '<div class="stat-val">'+total+'<span class="stat-unit">回</span></div>'+
+      '<div class="stat-lbl">今月のトレーニング</div>'+
+      '<div class="stat-trend up">今月'+daysInMonth+'日間</div>'+
+    '</div>'+
+    '<div class="stat-card" style="background:#f0fff4;border-color:rgba(52,199,89,0.15)">'+
+      '<div class="stat-val">'+volStr+'</div>'+
+      '<div class="stat-lbl">今月の総ボリューム</div>'+
+      '<div class="stat-trend up">重量×レップ×セット</div>'+
+    '</div>'+
+    '<div class="stat-card" style="background:#edf6ff;border-color:rgba(0,122,255,0.15)">'+
+      '<div class="stat-val">'+pace+'<span class="stat-unit">日/回</span></div>'+
+      '<div class="stat-lbl">平均ペース</div>'+
+      '<div class="stat-trend ok">'+paceWeekly+'ペース</div>'+
+    '</div>'+
+    '<div class="stat-card" style="background:#fff9f0;border-color:rgba(255,159,10,0.15)">'+
+      '<div class="stat-val">'+daysSince+'<span class="stat-unit">'+(daysSince!=='—'?'日前':'')+'</span></div>'+
+      '<div class="stat-lbl">前回から経過</div>'+
+      '<div class="stat-trend" style="color:'+daysSinceColor+'">'+daysSinceLabel+'</div>'+
+    '</div>';
+
+  const bodyParts = {
+    chest:   {label:'胸',  color:'#5e5ce6',sets:0,target:12},
+    back:    {label:'背中',color:'#007aff',sets:0,target:12},
+    leg:     {label:'脚',  color:'#34c759',sets:0,target:9},
+    shoulder:{label:'肩',  color:'#ff9500',sets:0,target:6},
+    arm:     {label:'腕',  color:'#ff3b30',sets:0,target:6},
+    core:    {label:'体幹',color:'#00c7be',sets:0,target:6},
+  };
+  recent.forEach(s=>s.exercises.forEach(e=>{
+    const cat = getExerciseCategorySync(e.name);
+    if(bodyParts[cat]) bodyParts[cat].sets += e.sets.length;
+  }));
+  const maxSets = Math.max(...Object.values(bodyParts).map(b=>b.sets), 1);
+
+  let balanceCard = document.getElementById('balanceCard');
+  if(!balanceCard){
+    balanceCard = document.createElement('div');
+    balanceCard.id = 'balanceCard';
+    balanceCard.style.cssText = 'background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:11px 12px;margin-bottom:8px';
+    document.getElementById('aiCard').parentNode.insertBefore(balanceCard, document.getElementById('aiCard'));
+  }
+  let balHtml = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">'+
+    '<div style="font-size:11px;font-weight:500;color:var(--text)">部位バランス</div>'+
+    '<div style="font-size:9px;color:var(--text4)">今月のセット数</div></div>';
+  Object.entries(bodyParts).forEach(([key,b])=>{
+    const pct = Math.round((b.sets/maxSets)*100);
+    const isLow = b.sets < b.target * 0.5;
+    const warn = isLow ? '⚠' : '';
+    const valColor = warn ? '#ff3b30' : 'var(--text4)';
+    balHtml += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
+      '<div style="font-size:9px;color:var(--text3);width:22px;flex-shrink:0">'+b.label+'</div>'+
+      '<div style="flex:1;height:6px;background:var(--bg);border-radius:99px;overflow:hidden">'+
+        '<div style="height:100%;width:'+pct+'%;background:'+b.color+';border-radius:99px"></div>'+
+      '</div>'+
+      '<div style="font-size:9px;color:'+valColor+';font-weight:'+(warn?'600':'400')+';width:30px;text-align:right;font-family:var(--mono)">'+b.sets+(warn?'⚠':'')+'</div>'+
+    '</div>';
+  });
+  balanceCard.innerHTML = balHtml;
+
+  const filterRow = document.getElementById('filterRow');
+  filterRow.innerHTML = '<div class="filter-chip'+(currentFilter==='all'?' on':'')+'" onclick="setFilter(\'all\')">全拠点</div>'+
+    GYMS.map(g=>'<div class="filter-chip'+(currentFilter===g.id?' on':'')+'" onclick="setFilter(\''+g.id+'\')">'+g.label+'</div>').join('');
+
   const exMap = {};
   for(const s of recent){
     for(const ex of s.exercises){
       const key = ex.name+'|'+s.gym;
-      if(!exMap[key]) exMap[key] = {name:ex.name, gym:s.gym, sessions:[]};
-      const vol = ex.sets.reduce((a,s)=>a+s.weight*s.reps,0);
+      if(!exMap[key]) exMap[key]={name:ex.name, gym:s.gym, sessions:[]};
+      const vol = ex.sets.reduce((a,st)=>a+st.weight*st.reps,0);
       exMap[key].sessions.push({date:s.date, vol});
     }
   }
   const exList = Object.values(exMap);
-  const growing = exList.filter(e=>{
-    if(e.sessions.length<2) return false;
-    const last = e.sessions[e.sessions.length-1].vol;
-    const prev = e.sessions[e.sessions.length-2].vol;
-    return last > prev;
-  }).length;
   const stagnant = exList.filter(e=>{
     if(e.sessions.length<3) return false;
     const vols = e.sessions.slice(-3).map(s=>s.vol);
     return Math.max(...vols)-Math.min(...vols) < vols[0]*0.05;
   });
-
-  document.getElementById('topStats').innerHTML = `
-    <div class="stat-card">
-      <div class="stat-val">${total}<span class="stat-unit">回</span></div>
-      <div class="stat-lbl">トレーニング数</div>
-      <div class="stat-trend up">直近1ヶ月</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">${growing}<span class="stat-unit">種目</span></div>
-      <div class="stat-lbl">伸びている</div>
-      <div class="stat-trend${growing>0?' up':' flat'}">${growing>0?'↑ 好調':'→ 様子見'}</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val">${stagnant.length}<span class="stat-unit">種目</span></div>
-      <div class="stat-lbl">停滞中</div>
-      <div class="stat-trend${stagnant.length>0?' flat':' up'}">${stagnant.length>0?'→ 要注意':'✓ 問題なし'}</div>
-    </div>`;
-
-  // filter
-  const filterRow = document.getElementById('filterRow');
-  filterRow.innerHTML = `<div class="filter-chip${currentFilter==='all'?' on':''}" onclick="setFilter('all')">全拠点</div>`
-    + GYMS.map(g=>`<div class="filter-chip${currentFilter===g.id?' on':''}" onclick="setFilter('${g.id}')">${g.label}</div>`).join('');
-
-  // exercise cards
   const filtered = currentFilter==='all' ? exList : exList.filter(e=>e.gym===currentFilter);
   filtered.sort((a,b)=>{
-    const va = a.sessions[a.sessions.length-1]?.vol||0;
-    const vb = b.sessions[b.sessions.length-1]?.vol||0;
+    const va=a.sessions[a.sessions.length-1]?.vol||0;
+    const vb=b.sessions[b.sessions.length-1]?.vol||0;
     return vb-va;
   });
 
   const epcEl = document.getElementById('epcList');
   if(!filtered.length){
-    epcEl.innerHTML = `<div class="empty"><span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 9 12 13 16 19 8"/><line x1="4" y1="20" x2="20" y2="20"/></svg></span></i><p>まだデータがありません。<br>トレーニングを記録すると<br>ここに表示されます。</p></div>`;
-    document.getElementById('aiContent').innerHTML = `<div class="ai-loading" style="color:var(--text4)"><span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="8.5"/><line x1="12" y1="11" x2="12" y2="16"/></svg></span></i> トレーニングを記録するとアドバイスが表示されます</div>`;
+    epcEl.innerHTML = '<div class="empty"><p style="font-size:32px;margin-bottom:12px">📊</p><p>まだデータがありません。<br>トレーニングを記録すると<br>ここに表示されます。</p></div>';
+    document.getElementById('aiContent').innerHTML = '<div class="ai-loading" style="color:var(--text4)">トレーニングを記録するとアドバイスが表示されます</div>';
     return;
   }
 
   epcEl.innerHTML = filtered.map(ex=>{
     const vols = ex.sessions.map(s=>s.vol);
     const last = vols[vols.length-1];
-    const prev = vols.length>=2 ? vols[vols.length-2] : null;
-    const delta = prev ? last-prev : 0;
+    const prev = vols.length>=2?vols[vols.length-2]:null;
+    const delta = prev?last-prev:0;
     const trend = delta>0?'up':delta<0?'dn':'flat';
-    const trendStr = delta>0?`↑ +${delta.toFixed(0)}kg 前回比`:delta<0?`↓ ${Math.abs(delta).toFixed(0)}kg 前回比`:'→ 前回と同じ';
+    const trendStr = delta>0?'↑ +'+delta.toFixed(0)+'kg':delta<0?'↓ '+Math.abs(delta).toFixed(0)+'kg':'→ 前回同じ';
     const gym = GYMS.find(g=>g.id===ex.gym);
-    const color = gym?.color||'#8e8e93';
-
-    const max = Math.max(...vols);
-    const min = Math.min(...vols,0);
-    const range = max-min||1;
+    const {icon, color, lightColor} = getIconWithColor(ex.name);
+    const max=Math.max(...vols), min=Math.min(...vols,0), range=max-min||1;
     const pts = vols.map((v,i)=>{
-      const x = vols.length===1 ? 170 : (i/(vols.length-1))*170;
-      const y = 32 - ((v-min)/range)*28;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
+      const x=vols.length===1?170:(i/(vols.length-1))*170;
+      const y=32-((v-min)/range)*28;
+      return x.toFixed(1)+','+y.toFixed(1);
     }).join(' ');
-    const lineColor = trend==='up'?'#34c759':trend==='dn'?'#ff3b30':'#aeaeb2';
-    const fillOpacity = trend==='up'?'0.12':trend==='dn'?'0.08':'0.08';
-    const lastPt = vols.map((v,i)=>{
-      const x = vols.length===1 ? 170 : (i/(vols.length-1))*170;
-      const y = 32 - ((v-min)/range)*28;
-      return {x,y};
-    });
-    const lastX = lastPt[lastPt.length-1]?.x||170;
-    const lastY = lastPt[lastPt.length-1]?.y||4;
+    const lx=vols.length===1?170:((vols.length-1)/(vols.length-1))*170;
+    const ly=32-((vols[vols.length-1]-min)/range)*28;
+    const lineColor=trend==='up'?'#34c759':trend==='dn'?'#ff3b30':'#aeaeb2';
+    const cgId='cg_'+ex.name.replace(/[^a-zA-Z0-9]/g,'_')+'_'+ex.gym;
 
-    return `<div class="epc">
-      <div class="epc-head">
-        <div class="epc-left">
-          <div class="ex-ico" style="width:26px;height:26px;border-radius:7px">${getIcon(ex.name)}</div>
-          <div>
-            <div class="epc-name">${ex.name}</div>
-            <div class="epc-gym" style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-flex;width:13px;height:13px;flex-shrink:0">${gym?.icon||''}</span>${gym?.label||ex.gym}</div>
-          </div>
-        </div>
-        <div class="epc-right">
-          <div class="epc-val">${last.toLocaleString()}<span class="epc-unit">kg</span></div>
-          <div class="epc-delta ${trend}">${trendStr}</div>
-        </div>
-      </div>
-      <div class="epc-chart">
-        <svg viewBox="0 0 170 36" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-          <defs><linearGradient id="cg_${ex.name.replace(/\s/g,'_')}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="${lineColor}" stop-opacity="${fillOpacity}"/>
-            <stop offset="100%" stop-color="${lineColor}" stop-opacity="0"/>
-          </linearGradient></defs>
-          <polyline points="${pts} ${lastX.toFixed(1)},36 0,36" fill="url(#cg_${ex.name.replace(/\s/g,'_')})" stroke="none"/>
-          <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${lineColor}"/>
-        </svg>
-      </div>
-    </div>`;
+    return '<div class="epc">'+
+      '<div class="epc-head">'+
+        '<div class="epc-left">'+
+          '<div class="ex-ico" style="width:26px;height:26px;border-radius:7px;background:'+lightColor+'">'+icon+'</div>'+
+          '<div>'+
+            '<div class="epc-name">'+ex.name+'</div>'+
+            '<div class="epc-gym" style="display:inline-flex;align-items:center;gap:4px">'+
+              '<span style="width:5px;height:5px;border-radius:50%;background:'+(gym?.color||'#8e8e93')+';display:inline-block;flex-shrink:0"></span>'+
+              (gym?.label||ex.gym)+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="epc-right">'+
+          '<div class="epc-val">'+last.toLocaleString()+'<span class="epc-unit">kg</span></div>'+
+          '<div class="epc-delta '+trend+'">'+trendStr+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="epc-chart">'+
+        '<svg viewBox="0 0 170 36" preserveAspectRatio="none">'+
+          '<defs><linearGradient id="'+cgId+'" x1="0" y1="0" x2="0" y2="1">'+
+            '<stop offset="0%" stop-color="'+lineColor+'" stop-opacity="0.12"/>'+
+            '<stop offset="100%" stop-color="'+lineColor+'" stop-opacity="0"/>'+
+          '</linearGradient></defs>'+
+          '<polyline points="'+pts+' '+lx.toFixed(1)+',36 0,36" fill="url(#'+cgId+')" stroke="none"/>'+
+          '<polyline points="'+pts+'" fill="none" stroke="'+lineColor+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'+
+          '<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="3" fill="'+lineColor+'"/>'+
+        '</svg>'+
+      '</div>'+
+    '</div>';
   }).join('');
 
-  // AI advice
-  generateAIAdvice(filtered, stagnant, all);
+  generateAIAdvice(filtered, stagnant, all, bodyParts);
 }
 
 function setFilter(id){
@@ -1222,6 +1356,9 @@ ${summary}
 ${stagnant.map(e=>e.name).join('、')||'なし'}
 
 腕系の記録: ${missingArms?'なし（要追加）':'あり'}
+
+【部位別セット数 vs 目標】
+${bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+': '+b.sets+'セット（目標'+b.target+'以上）'+(b.sets<b.target*0.5?'★不足':'')).join(', ') : ''}
 
 以下のJSON形式のみで返してください（説明文不要）:
 [{"type":"miss|warn|ok","text":"アドバイス文（30文字以内）","detail":"詳細（40文字以内）"}]`;
@@ -1300,6 +1437,30 @@ function toggleDetail(el){
 }
 
 
+
+
+// --- INSTALL BANNER ---
+function checkInstallBanner(){
+  // スタンドアロンモード（ホーム画面から起動）なら非表示
+  const isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if(isStandalone) return;
+  // 一度閉じたら再表示しない
+  if(localStorage.getItem('wt_banner_dismissed')) return;
+  // iOSのSafariのみ表示
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isSafari = /safari/i.test(navigator.userAgent) && !/chrome|crios|fxios/i.test(navigator.userAgent);
+  if(isIOS && isSafari){
+    setTimeout(()=>{
+      document.getElementById('installBanner').style.display = 'flex';
+    }, 2000);
+  }
+}
+
+function dismissBanner(){
+  document.getElementById('installBanner').style.display = 'none';
+  localStorage.setItem('wt_banner_dismissed', '1');
+}
 
 // --- SETTINGS / GYM MANAGEMENT ---
 const GYM_COLORS = ['#5e5ce6','#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#00c7be'];
