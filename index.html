@@ -23,6 +23,25 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 
 
+
+/* SETTINGS */
+.settings-section{margin-bottom:24px}
+.settings-section-title{font-size:11px;color:var(--text3);letter-spacing:0.07em;margin-bottom:8px;padding:0 4px}
+.settings-item{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.settings-item-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.settings-item-body{flex:1;min-width:0}
+.settings-item-name{font-size:14px;font-weight:500;color:var(--text)}
+.settings-item-sub{font-size:11px;color:var(--text4);margin-top:2px}
+.settings-item-del{width:30px;height:30px;border:none;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;touch-action:manipulation;flex-shrink:0}
+.settings-item-del:active{color:var(--red)}
+.settings-add-row{display:flex;gap:8px;margin-top:4px}
+.settings-add-input{flex:1;background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-size:16px;color:var(--text);font-family:var(--font);outline:none}
+.settings-add-input:focus{border-color:var(--accent)}
+.settings-add-btn{padding:10px 16px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);touch-action:manipulation;white-space:nowrap}
+.color-picker-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.color-opt{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all 0.15s;touch-action:manipulation;flex-shrink:0}
+.color-opt.on{border-color:var(--text);transform:scale(1.15)}
+
 /* DELETE */
 .hist-del{font-size:11px;color:var(--red);padding:4px 8px;border:0.5px solid rgba(255,59,48,0.3);border-radius:99px;background:none;cursor:pointer;font-family:var(--font);margin-top:8px;display:block;width:100%;touch-action:manipulation}
 .hist-del:active{background:rgba(255,59,48,0.08)}
@@ -34,6 +53,8 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .delete-btn-red{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff;margin-bottom:8px;touch-action:manipulation}
 .delete-btn-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
 
+.set-del-btn{width:32px;height:32px;border:0.5px solid var(--border);border-radius:8px;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s}
+.set-del-btn:active{background:rgba(255,59,48,0.08);border-color:var(--red);color:var(--red)}
 /* NUM INPUT */
 .num-ctrl{display:flex;align-items:center;background:var(--surface);border-radius:var(--radius-xs);padding:3px 4px;gap:2px}
 .num-ctrl-btn{width:34px;height:34px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:7px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
@@ -315,6 +336,26 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 <!-- SCREENS -->
 <div class="screens">
+
+  <!-- 設定 -->
+  <div class="screen" id="screen-settings">
+    <div class="page-title">設定</div>
+    <div class="page-sub">拠点の管理</div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">拠点</div>
+      <div id="gymSettingsList"></div>
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:6px">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px">拠点を追加</div>
+        <div class="settings-add-row">
+          <input class="settings-add-input" id="newGymInput" placeholder="拠点名を入力" type="text" inputmode="text">
+          <button class="settings-add-btn" onclick="addGym()">追加</button>
+        </div>
+        <div class="color-picker-row" id="colorPicker"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- 記録 -->
   <div class="screen on" id="screen-rec">
     <div class="page-title">今日</div>
@@ -375,7 +416,13 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
     <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 9 12 13 16 19 8"/><line x1="4" y1="20" x2="20" y2="20"/></svg></span></i><span>伸び</span>
   </button>
   <button class="nav-btn" id="nav-hist" onclick="showScreen('hist',this)">
-    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg></span></i><span>履歴</span>
+    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg></span><span>履歴</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="showScreen('settings',this)">
+    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span>設定</span>
+  </button>
+  <button class="nav-btn" id="nav-settings" onclick="showScreen('settings',this)">
+    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span>設定</span>
   </button>
 </nav>
 
@@ -405,14 +452,10 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 <div class="toast" id="toast"></div>
 
 <script>
-const GYMS = [
-  {id:'jiyugaoka', label:'自由が丘', color:'#5e5ce6',
-   icon:`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" fill="#5e5ce6"/><path d="M5 8.5 L7.5 11 L11 5.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`},
-  {id:'ontakesan',  label:'御嶽山',  color:'#007aff',
-   icon:`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="3" fill="#007aff"/><path d="M4 10 L7 6 L9.5 9 L11 7.5 L13 10" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>`},
-  {id:'toritsu',   label:'都立大',   color:'#34c759',
-   icon:`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2 L14 13 L2 13 Z" fill="#34c759"/><path d="M8 6 L8 10 M6.5 11 L9.5 11" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/></svg>`},
-];
+// GYMSは動的（localStorageから読み込み）
+let GYMS = [];
+// gymIconSvgはsettings_jsで定義するため、ここではプレースホルダ
+
 
 const EXERCISE_ICONS = {
   'チェストプレス': `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="10" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="10" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="5" y="12" width="14" height="1.5" rx="0.75" fill="#a5a3f0"/><ellipse cx="9" cy="12" rx="2.5" ry="3" fill="#5e5ce6" opacity="0.55"/><ellipse cx="15" cy="12" rx="2.5" ry="3" fill="#5e5ce6" opacity="0.55"/></svg>`,
@@ -441,7 +484,7 @@ const EXERCISE_ICONS = {
 
 const DEFAULT_ICON = `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="20" height="2" rx="1" fill="#5e5ce6"/><rect x="2" y="11" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="11" width="3" height="5" rx="1.5" fill="#5e5ce6"/></svg>`;
 
-const EXERCISE_MASTER = {
+const EXERCISE_MASTER_BASE = {
   jiyugaoka: ['アブドミナル','チェストプレス','ショルダープレス','レッグプレス','リアデルト','ペックフライ','ラテラルレイズ','レッグカール','ダイバージングシーテッドロウ','ラットプルダウン','ロータリートルソー','レッグエクステンション','スミスマシン'],
   ontakesan: ['ダイバージングローロウ','ペックフライ','リアデルト','ラットプルダウン','レッグエクステンション','チェストプレス','レッグプレス','ショルダープレス','プローンレッグカール','ワンハンドローイング','インクラインベンチプレス','スミスマシン'],
   toritsu: ['ラットプルダウン','シーテッドレッグプレス','ロー リアデルトイド','トーソローテーション','シーテッドレッグカール','ショルダープレス','アブドミナル','チェストプレス','ヒップアブダクター','レッグエクステンション','スミスマシン','ワンハンドローイング','インクラインベンチプレス'],
@@ -466,7 +509,14 @@ function today(){ return new Date().toISOString().slice(0,10); }
 function fmtDate(d){ const dt=new Date(d); return dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日'; }
 function dayLabel(d){ const days=['日','月','火','水','木','金','土']; return days[new Date(d).getDay()]+'曜日'; }
 
-function getIcon(name){ return EXERCISE_ICONS[name]||DEFAULT_ICON; }
+function getIcon(name){
+  if(EXERCISE_ICONS[name]) return EXERCISE_ICONS[name];
+  // カスタム種目: キャッシュからカテゴリを取得
+  const cat = customExerciseCategories[name] ||
+    (()=>{ try{ return JSON.parse(localStorage.getItem('wt_categories')||'{}')[name]; }catch(e){} })();
+  if(cat) return getIconByCategory(cat);
+  return DEFAULT_ICON;
+}
 function gymColor(id){ return GYMS.find(g=>g.id===id)?.color||'#8e8e93'; }
 function gymLabel(id){ const g=GYMS.find(g=>g.id===id); return g?g.label:id; }
 function gymBadge(id){ const g=GYMS.find(g=>g.id===id); if(!g) return id; return '<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">'+g.icon+'</span>'+g.label+'</span>'; }
@@ -474,6 +524,57 @@ function gymBadge(id){ const g=GYMS.find(g=>g.id===id); if(!g) return id; return
 // --- INIT ---
 
 
+
+
+// --- EXERCISE CATEGORY ICONS ---
+const CATEGORY_ICONS = {
+  chest: `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="10" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="10" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="5" y="12" width="14" height="1.5" rx="0.75" fill="#a5a3f0"/><ellipse cx="9" cy="12" rx="2.5" ry="3" fill="#5e5ce6" opacity="0.55"/><ellipse cx="15" cy="12" rx="2.5" ry="3" fill="#5e5ce6" opacity="0.55"/></svg>`,
+  back: `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="2" rx="1" fill="#5e5ce6"/><line x1="7" y1="6" x2="10" y2="13" stroke="#a5a3f0" stroke-width="1.5" stroke-linecap="round"/><line x1="17" y1="6" x2="14" y2="13" stroke="#a5a3f0" stroke-width="1.5" stroke-linecap="round"/><rect x="10" y="12" width="4" height="2" rx="1" fill="#a5a3f0"/><circle cx="12" cy="18" r="2.5" fill="#5e5ce6"/></svg>`,
+  shoulder: `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="12" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="12" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="5" y="13.5" width="14" height="2" rx="1" fill="#a5a3f0"/><path d="M9 13 Q12 7 15 13" stroke="#5e5ce6" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>`,
+  leg: `<svg viewBox="0 0 24 24" fill="none"><path d="M5 9 L12 9 Q18 9 18 15 L18 17" stroke="#5e5ce6" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="16" y="15" width="5" height="3" rx="1.5" fill="#5e5ce6"/><circle cx="5" cy="9" r="2" fill="#a5a3f0"/></svg>`,
+  arm: `<svg viewBox="0 0 24 24" fill="none"><path d="M6 18 Q6 10 12 8 Q16 7 18 10" stroke="#5e5ce6" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M18 10 Q20 13 17 15 Q14 17 12 14" stroke="#5e5ce6" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="12" cy="14" r="2" fill="#a5a3f0"/></svg>`,
+  core: `<svg viewBox="0 0 24 24" fill="none"><rect x="9" y="4" width="6" height="3.5" rx="1.5" fill="#5e5ce6"/><rect x="9" y="9" width="6" height="3.5" rx="1.5" fill="#5e5ce6" opacity="0.8"/><rect x="9" y="14" width="6" height="3.5" rx="1.5" fill="#5e5ce6" opacity="0.55"/><line x1="12" y1="4" x2="12" y2="17.5" stroke="#a5a3f0" stroke-width="0.8"/></svg>`,
+  cardio: `<svg viewBox="0 0 24 24" fill="none"><path d="M3 12 Q5 6 8 12 Q10 16 12 10 Q14 4 16 12 Q18 18 21 12" stroke="#5e5ce6" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  default: `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="20" height="2" rx="1" fill="#5e5ce6"/><rect x="2" y="11" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="11" width="3" height="5" rx="1.5" fill="#5e5ce6"/></svg>`,
+};
+
+function getExerciseMaster(gymId){
+  return EXERCISE_MASTER_BASE[gymId] || [];
+}
+// カスタム種目のアイコンキャッシュ
+const customExerciseCategories = {};
+
+async function detectExerciseCategory(name){
+  if(customExerciseCategories[name]) return customExerciseCategories[name];
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens:50,
+        messages:[{role:'user',content:`筋トレ種目「${name}」は次のどのカテゴリですか？1単語で答えてください: chest(胸), back(背中), shoulder(肩), leg(脚), arm(腕・二頭・三頭), core(腹筋・体幹), cardio(有酸素), default(その他)`}]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content?.[0]?.text||'').toLowerCase().trim();
+    const cat = ['chest','back','shoulder','leg','arm','core','cardio'].find(c=>text.includes(c)) || 'default';
+    customExerciseCategories[name] = cat;
+    // localStorageにも保存
+    try{
+      const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+      saved[name] = cat;
+      localStorage.setItem('wt_categories', JSON.stringify(saved));
+    }catch(e){}
+    return cat;
+  }catch(e){
+    return 'default';
+  }
+}
+
+function getIconByCategory(cat){
+  return CATEGORY_ICONS[cat] || CATEGORY_ICONS.default;
+}
 
 // --- DATE ---
 let selectedDate = today();
@@ -520,6 +621,15 @@ function toggleDatePicker(){
 }
 
 function init(){
+  // GYMSをlocalStorageから読み込む
+  GYMS = loadGyms();
+  // GYMSにiconを付与
+  GYMS.forEach(g=>{ if(!g.icon) g.icon = gymIconSvg(g.color); });
+  // カテゴリキャッシュを読み込む
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+    Object.assign(customExerciseCategories, saved);
+  }catch(e){}
   renderGymChips();
   renderDate();
   initDateUI();
@@ -563,12 +673,12 @@ function hideSuggest(){
 
 function filterSuggest(){
   const val = document.getElementById('addInput').value.trim().toLowerCase();
-  const master = EXERCISE_MASTER[currentGym] || [];
+  const master = getExerciseMaster(currentGym);
   const added = exercises.map(e=>e.name);
   let items = master.filter(n=>!added.includes(n));
   if(val) items = items.filter(n=>n.toLowerCase().includes(val));
 
-  const other = Object.entries(EXERCISE_MASTER)
+  const other = Object.entries(EXERCISE_MASTER_BASE)
     .filter(([g])=>g!==currentGym)
     .flatMap(([g,list])=>list.map(n=>({name:n,gym:g})))
     .filter(({name})=>!added.includes(name) && (!val||name.toLowerCase().includes(val)))
@@ -647,7 +757,7 @@ function getPrevSets(name){
   return null;
 }
 
-function addExerciseByName(name){
+async function addExerciseByName(name){
   if(exercises.find(e=>e.name===name)){ showToast('すでに追加されています'); return; }
   const prev = getPrevSets(name);
   let sets;
@@ -664,6 +774,18 @@ function addExerciseByName(name){
     const el = document.querySelector('.ex-card:last-of-type');
     if(el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
   }, 100);
+  // プリセットにない種目はAIでカテゴリ判定（バックグラウンド）
+  if(!EXERCISE_ICONS[name]){
+    detectExerciseCategory(name).then(()=>{
+      // アイコン更新（再描画不要、次回から反映）
+      document.querySelectorAll('.ex-ico, .suggest-ico').forEach(el=>{
+        const nameEl = el.closest('.ex-head, .suggest-item')?.querySelector('.ex-name, .suggest-name');
+        if(nameEl?.textContent?.trim() === name){
+          el.innerHTML = getIcon(name);
+        }
+      });
+    });
+  }
 }
 
 function removeExercise(idx){
@@ -708,6 +830,13 @@ function changeVal(ei, si, field, delta){
   // preset tagを非表示
   const presetTags = document.querySelectorAll('.preset-tag');
   // done-btn状態は変えない
+}
+
+
+function removeSet(ei, si){
+  if(exercises[ei].sets.length <= 1) return;
+  exercises[ei].sets.splice(si, 1);
+  renderRec();
 }
 
 function addSet(ei){
@@ -771,6 +900,7 @@ function renderRec(){
         </div>
         <div class="set-row-bottom">
           <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">${s.done?'✓ セット完了':'セット完了'}</button>
+          ${exercises[ei].sets.length > 1 ? `<button class="set-del-btn" onclick="removeSet(${ei},${si})" title="このセットを削除"><span style="display:inline-flex;width:14px;height:14px">` + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' + `</span></button>` : ''}
         </div>
       </div>`).join('');
 
@@ -1158,6 +1288,85 @@ function toggleDetail(el){
 }
 
 
+
+// --- SETTINGS / GYM MANAGEMENT ---
+const GYM_COLORS = ['#5e5ce6','#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#00c7be'];
+let selectedNewColor = GYM_COLORS[0];
+
+function loadGyms(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_gyms')||'null');
+    if(saved && saved.length) return saved;
+  }catch(e){}
+  return [
+    {id:'jiyugaoka', label:'自由が丘', color:'#5e5ce6'},
+    {id:'ontakesan',  label:'御嶽山',   color:'#007aff'},
+    {id:'toritsu',   label:'都立大',   color:'#34c759'},
+  ];
+}
+
+function saveGyms(){
+  localStorage.setItem('wt_gyms', JSON.stringify(GYMS));
+}
+
+function gymIconSvg(color){
+  return `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" fill="${color}"/><path d="M5 8.5 L7.5 11 L11 5.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function renderGymSettings(){
+  const list = document.getElementById('gymSettingsList');
+  list.innerHTML = GYMS.map((g,i)=>`
+    <div class="settings-item">
+      <div class="settings-item-icon" style="background:${g.color}20">
+        <span style="display:inline-flex;width:20px;height:20px">${gymIconSvg(g.color)}</span>
+      </div>
+      <div class="settings-item-body">
+        <div class="settings-item-name">${g.label}</div>
+        <div class="settings-item-sub" style="color:${g.color}">${g.color}</div>
+      </div>
+      ${GYMS.length > 1 ? `<button class="settings-item-del" onclick="confirmDeleteGym(${i})" title="削除">
+        <span style="display:inline-flex;width:16px;height:16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>
+      </button>` : ''}
+    </div>`).join('');
+
+  // カラーピッカー
+  const picker = document.getElementById('colorPicker');
+  picker.innerHTML = GYM_COLORS.map(c=>`
+    <div class="color-opt${c===selectedNewColor?' on':''}" style="background:${c}" onclick="selectColor('${c}')"></div>
+  `).join('');
+}
+
+function selectColor(c){
+  selectedNewColor = c;
+  renderGymSettings();
+}
+
+function addGym(){
+  const input = document.getElementById('newGymInput');
+  const name = input.value.trim();
+  if(!name){ showToast('拠点名を入力してください'); return; }
+  if(GYMS.find(g=>g.label===name)){ showToast('すでに存在します'); return; }
+  const id = 'gym_' + Date.now();
+  GYMS.push({id, label:name, color:selectedNewColor});
+  saveGyms();
+  input.value = '';
+  renderGymSettings();
+  renderGymChips();
+  showToast(name + ' を追加しました');
+}
+
+function confirmDeleteGym(idx){
+  const gym = GYMS[idx];
+  if(GYMS.length <= 1){ showToast('最低1拠点は必要です'); return; }
+  if(!confirm(gym.label + ' を削除しますか？\n（記録データは残ります）')) return;
+  if(currentGym === gym.id) currentGym = GYMS[idx===0?1:0].id;
+  GYMS.splice(idx,1);
+  saveGyms();
+  renderGymSettings();
+  renderGymChips();
+  showToast('削除しました');
+}
+
 // --- DELETE ---
 let deleteTargetId = null;
 
@@ -1192,6 +1401,7 @@ function showScreen(id, btn){
   btn.classList.add('on');
   if(id==='dash') renderDash();
   if(id==='hist') renderHist();
+  if(id==='settings') renderGymSettings();
 }
 
 // --- TOAST ---
