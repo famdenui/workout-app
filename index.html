@@ -53,11 +53,11 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .delete-btn-red{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff;margin-bottom:8px;touch-action:manipulation}
 .delete-btn-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
 
-.set-del-btn{width:32px;height:32px;border:0.5px solid var(--border);border-radius:8px;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s}
+.set-del-btn{width:28px;height:28px;border:0.5px solid var(--border);border-radius:7px;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s}
 .set-del-btn:active{background:rgba(255,59,48,0.08);border-color:var(--red);color:var(--red)}
 /* NUM INPUT */
-.num-ctrl{display:flex;align-items:center;background:var(--surface);border-radius:var(--radius-xs);padding:3px 4px;gap:2px}
-.num-ctrl-btn{width:34px;height:34px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:7px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
+.num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:2px 3px;gap:1px}
+.num-ctrl-btn{width:30px;height:32px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-direct{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono);text-align:center;min-width:52px;background:none;border:none;outline:none;cursor:pointer;padding:4px 2px;border-radius:6px;touch-action:manipulation}
 .num-direct:focus{background:var(--surface);box-shadow:0 0 0 1.5px var(--accent);}
@@ -127,16 +127,15 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .ex-del:hover{background:var(--bg);color:var(--text3)}
 
 /* SET ROW */
-.set-row{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;background:var(--bg);border-radius:10px;padding:8px 10px}
-.set-row-top{display:flex;align-items:center;gap:6px}
-.set-row-bottom{display:flex;align-items:center;gap:6px;padding-left:20px}
-.set-num{font-size:10px;color:var(--text5);width:14px;text-align:center;font-family:var(--mono);flex-shrink:0}
+.set-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+
+.set-num{display:none}
 .num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:4px 4px;gap:2px}
 .num-ctrl-btn{width:36px;height:36px;border:none;background:none;color:var(--text4);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-val{font-size:12px;font-weight:500;color:var(--text);min-width:36px;text-align:center;font-family:var(--mono)}
-.done-btn{font-size:12px;padding:8px 0;border-radius:8px;border:0.5px solid var(--border);background:var(--surface);color:var(--text4);cursor:pointer;white-space:nowrap;font-family:var(--font);transition:all 0.15s;flex:1;text-align:center;touch-action:manipulation}
-.done-btn.on{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.done-btn{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface);color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s;margin-left:auto}
+.done-btn.on{background:var(--green);border-color:var(--green);color:#fff}
 .preset-tag{font-size:9px;color:var(--text5);background:var(--bg);padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0}
 .add-set-btn{display:flex;align-items:center;gap:5px;padding:5px 2px;margin-top:2px;cursor:pointer;color:var(--text4);border:none;background:none;font-family:var(--font)}
 .add-set-btn span:first-child{width:13px;height:13px}
@@ -417,9 +416,6 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
   </button>
   <button class="nav-btn" id="nav-hist" onclick="showScreen('hist',this)">
     <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5"/></svg></span><span>履歴</span>
-  </button>
-  <button class="nav-btn" id="nav-settings" onclick="showScreen('settings',this)">
-    <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span>設定</span>
   </button>
   <button class="nav-btn" id="nav-settings" onclick="showScreen('settings',this)">
     <span class="nav-ico" style="display:inline-flex;width:22px;height:22px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span>設定</span>
@@ -811,25 +807,17 @@ function changeVal(ei, si, field, delta){
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
-  // inputの値を直接更新（再描画せずフォーカスを保持）
-  const inputs = document.querySelectorAll('.num-direct');
-  inputs.forEach(inp=>{
-    const row = inp.closest('.set-row');
-    if(!row) return;
-    const allRows = [...inp.closest('.ex-card').querySelectorAll('.set-row')];
-    const rIdx = allRows.indexOf(row);
-    const cards = [...document.querySelectorAll('.ex-card')];
-    const eIdx = cards.indexOf(inp.closest('.ex-card'));
-    if(eIdx===ei && rIdx===si){
-      const isWeight = inp.type==='number' && inp.style.width==='52px';
-      const isReps = inp.style.width==='38px';
-      if(field==='weight' && isWeight) inp.value = v;
-      if(field==='reps' && isReps) inp.value = v;
+  // inputの値のみ更新（再描画なし）
+  const card = document.querySelectorAll('.ex-card')[ei];
+  if(card){
+    const rows = card.querySelectorAll('.set-row');
+    const row = rows[si];
+    if(row){
+      const inputs = row.querySelectorAll('.num-direct');
+      if(field==='weight' && inputs[0]) inputs[0].value = v;
+      if(field==='reps' && inputs[1]) inputs[1].value = v;
     }
-  });
-  // preset tagを非表示
-  const presetTags = document.querySelectorAll('.preset-tag');
-  // done-btn状態は変えない
+  }
 }
 
 
@@ -878,30 +866,28 @@ function renderRec(){
 
     const setsHtml = ex.sets.map((s,si)=>`
       <div class="set-row">
-        <div class="set-row-top">
-          <div class="set-num">${si+1}</div>
-          <div class="num-ctrl">
-            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
-            <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
-              onchange="setVal(${ei},${si},'weight',this.value)"
-              onfocus="this.select()" style="width:48px">
-            <span style="font-size:11px;color:var(--text4);margin-right:2px">kg</span>
-            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
-          </div>
-          <div class="num-ctrl">
-            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
-            <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
-              onchange="setVal(${ei},${si},'reps',this.value)"
-              onfocus="this.select()" style="width:34px">
-            <span style="font-size:11px;color:var(--text4);margin-right:2px">回</span>
-            <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
-          </div>
-          ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
+        <div class="set-num">${si+1}</div>
+        <div class="num-ctrl">
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
+          <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
+            onchange="setVal(${ei},${si},'weight',this.value)"
+            onfocus="this.select()" style="width:42px">
+          <span style="font-size:11px;color:var(--text4)">kg</span>
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
         </div>
-        <div class="set-row-bottom">
-          <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">${s.done?'✓ セット完了':'セット完了'}</button>
-          ${exercises[ei].sets.length > 1 ? `<button class="set-del-btn" onclick="removeSet(${ei},${si})" title="このセットを削除"><span style="display:inline-flex;width:14px;height:14px">` + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' + `</span></button>` : ''}
+        <div class="num-ctrl">
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
+          <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
+            onchange="setVal(${ei},${si},'reps',this.value)"
+            onfocus="this.select()" style="width:28px">
+          <span style="font-size:11px;color:var(--text4)">回</span>
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
         </div>
+        ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
+        <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">
+          <span style="display:inline-flex;width:18px;height:18px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+        </button>
+        ${exercises[ei].sets.length > 1 ? `<button class="set-del-btn" onclick="removeSet(${ei},${si})"><span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>` : ''}
       </div>`).join('');
 
     return `
