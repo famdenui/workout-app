@@ -17,8 +17,8 @@
   --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;overscroll-behavior:none}
-body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100dvh;overflow:hidden;position:relative}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;overscroll-behavior:none;overflow-x:hidden;width:100%}
+body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100dvh;overflow:hidden;position:relative;overflow-x:hidden}
 
 
 
@@ -53,11 +53,11 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .delete-btn-red{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff;margin-bottom:8px;touch-action:manipulation}
 .delete-btn-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
 
-.set-del-btn{width:28px;height:28px;border:0.5px solid var(--border);border-radius:7px;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s}
+.set-del-btn{width:24px;height:24px;border:none;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s}
 .set-del-btn:active{background:rgba(255,59,48,0.08);border-color:var(--red);color:var(--red)}
 /* NUM INPUT */
 .num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:2px 3px;gap:1px}
-.num-ctrl-btn{width:30px;height:32px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
+.num-ctrl-btn{width:28px;height:30px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-direct{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono);text-align:center;min-width:52px;background:none;border:none;outline:none;cursor:pointer;padding:4px 2px;border-radius:6px;touch-action:manipulation}
 .num-direct:focus{background:var(--surface);box-shadow:0 0 0 1.5px var(--accent);}
@@ -127,14 +127,14 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .ex-del:hover{background:var(--bg);color:var(--text3)}
 
 /* SET ROW */
-.set-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.set-row{display:flex;align-items:center;gap:4px;margin-bottom:5px}
 
 .set-num{display:none}
 .num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:4px 4px;gap:2px}
 .num-ctrl-btn{width:36px;height:36px;border:none;background:none;color:var(--text4);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-val{font-size:12px;font-weight:500;color:var(--text);min-width:36px;text-align:center;font-family:var(--mono)}
-.done-btn{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface);color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s;margin-left:auto}
+.done-btn{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface);color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s;margin-left:auto}
 .done-btn.on{background:var(--green);border-color:var(--green);color:#fff}
 .preset-tag{font-size:9px;color:var(--text5);background:var(--bg);padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0}
 .add-set-btn{display:flex;align-items:center;gap:5px;padding:5px 2px;margin-top:2px;cursor:pointer;color:var(--text4);border:none;background:none;font-family:var(--font)}
@@ -798,6 +798,24 @@ function setVal(ei, si, field, raw){
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
+  // 重量の場合: 後続のpresetセットに同じ値を反映
+  if(field === 'weight'){
+    const card = document.querySelectorAll('.ex-card')[ei];
+    exercises[ei].sets.forEach((s, idx) => {
+      if(idx > si && s.preset && !s.done){
+        s.weight = v;
+        // DOM更新
+        if(card){
+          const rows = card.querySelectorAll('.set-row');
+          const row = rows[idx];
+          if(row){
+            const inp = row.querySelectorAll('.num-direct')[0];
+            if(inp) inp.value = v;
+          }
+        }
+      }
+    });
+  }
 }
 
 function changeVal(ei, si, field, delta){
@@ -807,7 +825,6 @@ function changeVal(ei, si, field, delta){
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
-  // inputの値のみ更新（再描画なし）
   const card = document.querySelectorAll('.ex-card')[ei];
   if(card){
     const rows = card.querySelectorAll('.set-row');
@@ -816,6 +833,19 @@ function changeVal(ei, si, field, delta){
       const inputs = row.querySelectorAll('.num-direct');
       if(field==='weight' && inputs[0]) inputs[0].value = v;
       if(field==='reps' && inputs[1]) inputs[1].value = v;
+    }
+    // 重量: 後続presetセットにも反映
+    if(field === 'weight'){
+      exercises[ei].sets.forEach((s, idx) => {
+        if(idx > si && s.preset && !s.done){
+          s.weight = v;
+          const r = rows[idx];
+          if(r){
+            const inp = r.querySelectorAll('.num-direct')[0];
+            if(inp) inp.value = v;
+          }
+        }
+      });
     }
   }
 }
@@ -885,7 +915,7 @@ function renderRec(){
         </div>
         ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
         <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">
-          <span style="display:inline-flex;width:18px;height:18px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
         </button>
         ${exercises[ei].sets.length > 1 ? `<button class="set-del-btn" onclick="removeSet(${ei},${si})"><span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>` : ''}
       </div>`).join('');
