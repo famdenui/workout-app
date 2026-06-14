@@ -134,9 +134,9 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .num-ctrl-btn{width:36px;height:36px;border:none;background:none;color:var(--text4);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:8px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none}
 .num-ctrl-btn:active{background:var(--border2)}
 .num-val{font-size:12px;font-weight:500;color:var(--text);min-width:36px;text-align:center;font-family:var(--mono)}
-.done-btn{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface);color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s;margin-left:auto}
+.done-btn{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border2);background:var(--surface);color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;touch-action:manipulation;transition:all 0.15s;margin-left:auto}
 .done-btn.on{background:var(--green);border-color:var(--green);color:#fff}
-.preset-tag{font-size:9px;color:var(--text5);background:var(--bg);padding:2px 6px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.preset-tag{display:none}
 .add-set-btn{display:flex;align-items:center;gap:5px;padding:5px 2px;margin-top:2px;cursor:pointer;color:var(--text4);border:none;background:none;font-family:var(--font)}
 .add-set-btn span:first-child{width:13px;height:13px}
 .add-set-btn span{font-size:11px}
@@ -790,6 +790,24 @@ function removeExercise(idx){
 }
 
 
+
+function syncWeightForward(ei, si, v){
+  const card = document.querySelectorAll('.ex-card')[ei];
+  exercises[ei].sets.forEach((s, idx) => {
+    if(idx > si && !s.done){
+      s.weight = v;
+      if(card){
+        const rows = card.querySelectorAll('.set-row');
+        const row = rows[idx];
+        if(row){
+          const inp = row.querySelectorAll('.num-direct')[0];
+          if(inp) inp.value = v;
+        }
+      }
+    }
+  });
+}
+
 function setVal(ei, si, field, raw){
   const step = field==='weight' ? 0.5 : 1;
   let v = parseFloat(raw);
@@ -798,23 +816,9 @@ function setVal(ei, si, field, raw){
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
-  // 重量の場合: 後続のpresetセットに同じ値を反映
+  // 重量: 後続の未完了セットに同期
   if(field === 'weight'){
-    const card = document.querySelectorAll('.ex-card')[ei];
-    exercises[ei].sets.forEach((s, idx) => {
-      if(idx > si && s.preset && !s.done){
-        s.weight = v;
-        // DOM更新
-        if(card){
-          const rows = card.querySelectorAll('.set-row');
-          const row = rows[idx];
-          if(row){
-            const inp = row.querySelectorAll('.num-direct')[0];
-            if(inp) inp.value = v;
-          }
-        }
-      }
-    });
+    syncWeightForward(ei, si, v);
   }
 }
 
@@ -825,6 +829,7 @@ function changeVal(ei, si, field, delta){
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
+  // DOM更新
   const card = document.querySelectorAll('.ex-card')[ei];
   if(card){
     const rows = card.querySelectorAll('.set-row');
@@ -834,19 +839,10 @@ function changeVal(ei, si, field, delta){
       if(field==='weight' && inputs[0]) inputs[0].value = v;
       if(field==='reps' && inputs[1]) inputs[1].value = v;
     }
-    // 重量: 後続presetセットにも反映
-    if(field === 'weight'){
-      exercises[ei].sets.forEach((s, idx) => {
-        if(idx > si && s.preset && !s.done){
-          s.weight = v;
-          const r = rows[idx];
-          if(r){
-            const inp = r.querySelectorAll('.num-direct')[0];
-            if(inp) inp.value = v;
-          }
-        }
-      });
-    }
+  }
+  // 重量: 後続の未完了セットに同期
+  if(field === 'weight'){
+    syncWeightForward(ei, si, v);
   }
 }
 
@@ -902,7 +898,7 @@ function renderRec(){
           <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
             onchange="setVal(${ei},${si},'weight',this.value)"
             onfocus="this.select()" style="width:42px">
-          <span style="font-size:11px;color:var(--text4)">kg</span>
+          <span style="font-size:10px;color:var(--text5)">kg</span>
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
         </div>
         <div class="num-ctrl">
@@ -910,12 +906,12 @@ function renderRec(){
           <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
             onchange="setVal(${ei},${si},'reps',this.value)"
             onfocus="this.select()" style="width:28px">
-          <span style="font-size:11px;color:var(--text4)">回</span>
+          <span style="font-size:10px;color:var(--text5)">回</span>
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
         </div>
         ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
         <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">
-          <span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <span style="display:inline-flex;width:12px;height:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
         </button>
         ${exercises[ei].sets.length > 1 ? `<button class="set-del-btn" onclick="removeSet(${ei},${si})"><span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></button>` : ''}
       </div>`).join('');
