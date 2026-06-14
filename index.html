@@ -34,11 +34,12 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .delete-btn-red{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--red);color:#fff;margin-bottom:8px;touch-action:manipulation}
 .delete-btn-cancel{width:100%;padding:13px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);background:var(--bg);color:var(--text3);touch-action:manipulation}
 
-/* DRUM ROLLER */
-.drum-wrap{display:flex;align-items:center;gap:2px;background:var(--bg);border-radius:var(--radius-xs);padding:4px 8px;cursor:ns-resize;user-select:none;-webkit-user-select:none;touch-action:none;min-width:64px;justify-content:center;position:relative}
-.drum-val{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono);text-align:center;min-width:44px;transition:transform 0.08s,opacity 0.08s}
-.drum-unit{font-size:11px;color:var(--text4);margin-left:1px}
-.drum-hint{font-size:9px;color:var(--text5);position:absolute;right:4px;top:50%;transform:translateY(-50%);pointer-events:none}
+/* NUM INPUT */
+.num-ctrl{display:flex;align-items:center;background:var(--bg);border-radius:var(--radius-xs);padding:3px 4px;gap:2px}
+.num-ctrl-btn{width:34px;height:34px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;border-radius:7px;flex-shrink:0;line-height:1;touch-action:manipulation;-webkit-user-select:none;font-weight:300}
+.num-ctrl-btn:active{background:var(--border2)}
+.num-direct{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono);text-align:center;min-width:52px;background:none;border:none;outline:none;cursor:pointer;padding:4px 2px;border-radius:6px;touch-action:manipulation}
+.num-direct:focus{background:var(--surface);box-shadow:0 0 0 1.5px var(--accent);}
 
 /* DATE PICKER */
 .date-row{display:flex;align-items:center;gap:8px;margin-bottom:12px}
@@ -471,52 +472,6 @@ function gymBadge(id){ const g=GYMS.find(g=>g.id===id); if(!g) return id; return
 // --- INIT ---
 
 
-// --- DRUM ROLLER ---
-function initDrum(el, getVal, setVal, step, fmt){
-  let startY = 0, lastY = 0, dragging = false, accDelta = 0;
-
-  function onStart(e){
-    dragging = true;
-    startY = e.touches ? e.touches[0].clientY : e.clientY;
-    lastY = startY;
-    accDelta = 0;
-    el.style.cursor = 'grabbing';
-    e.preventDefault();
-  }
-  function onMove(e){
-    if(!dragging) return;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const dy = lastY - y;
-    lastY = y;
-    accDelta += dy;
-    const threshold = 6;
-    if(Math.abs(accDelta) >= threshold){
-      const steps = Math.round(accDelta / threshold);
-      const newVal = Math.max(step, Math.round((getVal() + steps * step) / step) * step);
-      if(newVal !== getVal()){
-        setVal(newVal);
-        // アニメ
-        const vEl = el.querySelector('.drum-val');
-        vEl.style.transform = steps>0?'translateY(-4px)':'translateY(4px)';
-        vEl.style.opacity = '0.6';
-        setTimeout(()=>{ vEl.style.transform=''; vEl.style.opacity=''; },80);
-      }
-      accDelta = accDelta % threshold;
-    }
-    e.preventDefault();
-  }
-  function onEnd(){
-    dragging = false;
-    el.style.cursor = 'ns-resize';
-  }
-
-  el.addEventListener('touchstart', onStart, {passive:false});
-  el.addEventListener('touchmove', onMove, {passive:false});
-  el.addEventListener('touchend', onEnd);
-  el.addEventListener('mousedown', onStart);
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onEnd);
-}
 
 // --- DATE ---
 let selectedDate = today();
@@ -714,6 +669,17 @@ function removeExercise(idx){
   renderRec();
 }
 
+
+function setVal(ei, si, field, raw){
+  const step = field==='weight' ? 0.5 : 1;
+  let v = parseFloat(raw);
+  if(isNaN(v) || v <= 0) v = step;
+  if(field==='weight') v = Math.max(0.5, Math.round(v*2)/2);
+  else v = Math.max(1, Math.round(v));
+  exercises[ei].sets[si][field] = v;
+  exercises[ei].sets[si].preset = false;
+}
+
 function changeVal(ei, si, field, delta){
   const step = field==='weight' ? 0.5 : 1;
   let v = exercises[ei].sets[si][field] + delta*step;
@@ -721,7 +687,25 @@ function changeVal(ei, si, field, delta){
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
-  renderRec();
+  // inputの値を直接更新（再描画せずフォーカスを保持）
+  const inputs = document.querySelectorAll('.num-direct');
+  inputs.forEach(inp=>{
+    const row = inp.closest('.set-row');
+    if(!row) return;
+    const allRows = [...inp.closest('.ex-card').querySelectorAll('.set-row')];
+    const rIdx = allRows.indexOf(row);
+    const cards = [...document.querySelectorAll('.ex-card')];
+    const eIdx = cards.indexOf(inp.closest('.ex-card'));
+    if(eIdx===ei && rIdx===si){
+      const isWeight = inp.type==='number' && inp.style.width==='52px';
+      const isReps = inp.style.width==='38px';
+      if(field==='weight' && isWeight) inp.value = v;
+      if(field==='reps' && isReps) inp.value = v;
+    }
+  });
+  // preset tagを非表示
+  const presetTags = document.querySelectorAll('.preset-tag');
+  // done-btn状態は変えない
 }
 
 function addSet(ei){
@@ -764,11 +748,21 @@ function renderRec(){
     const setsHtml = ex.sets.map((s,si)=>`
       <div class="set-row">
         <div class="set-num">${si+1}</div>
-        <div class="drum-wrap" id="drum-w-${ei}-${si}" data-ei="${ei}" data-si="${si}" data-field="weight">
-          <div class="drum-val">${s.weight}kg</div>
+        <div class="num-ctrl">
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
+          <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
+            onchange="setVal(${ei},${si},'weight',this.value)"
+            onfocus="this.select()" style="width:52px">
+          <span style="font-size:11px;color:var(--text4);margin-right:2px">kg</span>
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
         </div>
-        <div class="drum-wrap" id="drum-r-${ei}-${si}" data-ei="${ei}" data-si="${si}" data-field="reps">
-          <div class="drum-val">${s.reps}回</div>
+        <div class="num-ctrl">
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
+          <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
+            onchange="setVal(${ei},${si},'reps',this.value)"
+            onfocus="this.select()" style="width:38px">
+          <span style="font-size:11px;color:var(--text4);margin-right:2px">回</span>
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
         </div>
         ${s.preset && !s.done ? '<div class="preset-tag">前回値</div>' : ''}
         <button class="done-btn${s.done?' on':''}" onclick="completeSet(${ei},${si})">${s.done?'✓ 完了':'完了'}</button>
@@ -790,25 +784,7 @@ function renderRec(){
         </button>
       </div>`;
   }).join('');
-  // ドラムロール初期化
-  setTimeout(()=>{
-    document.querySelectorAll('.drum-wrap').forEach(el=>{
-      const ei = parseInt(el.dataset.ei);
-      const si = parseInt(el.dataset.si);
-      const field = el.dataset.field;
-      const step = field==='weight' ? 0.5 : 1;
-      initDrum(
-        el,
-        ()=>exercises[ei].sets[si][field],
-        (v)=>{
-          exercises[ei].sets[si][field] = v;
-          exercises[ei].sets[si].preset = false;
-          el.querySelector('.drum-val').textContent = field==='weight' ? v+'kg' : v+'回';
-        },
-        step
-      );
-    });
-  }, 50);
+
 }
 
 // --- TIMER ---
