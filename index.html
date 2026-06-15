@@ -540,7 +540,6 @@ document.head.appendChild(link);
 <script>
 // GYMSは動的（localStorageから読み込み）
 let GYMS = [];
-// gymIconSvgはsettings_jsで定義するため、ここではプレースホルダ
 
 
 const EXERCISE_ICONS = {
@@ -571,13 +570,13 @@ const EXERCISE_ICONS = {
 const DEFAULT_ICON = `<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="11" width="20" height="2" rx="1" fill="#5e5ce6"/><rect x="2" y="11" width="3" height="5" rx="1.5" fill="#5e5ce6"/><rect x="19" y="11" width="3" height="5" rx="1.5" fill="#5e5ce6"/></svg>`;
 
 const EXERCISE_MASTER_BASE = {
+  toritsu: ['ラットプルダウン','シーテッドレッグプレス','ロー リアデルトイド','トーソローテーション','シーテッドレッグカール','ショルダープレス','アブドミナル','チェストプレス','ヒップアブダクター','レッグエクステンション','スミスマシン','ワンハンドローイング','インクラインベンチプレス'],
   jiyugaoka: ['アブドミナル','チェストプレス','ショルダープレス','レッグプレス','リアデルト','ペックフライ','ラテラルレイズ','レッグカール','ダイバージングシーテッドロウ','ラットプルダウン','ロータリートルソー','レッグエクステンション','スミスマシン'],
   ontakesan: ['ダイバージングローロウ','ペックフライ','リアデルト','ラットプルダウン','レッグエクステンション','チェストプレス','レッグプレス','ショルダープレス','プローンレッグカール','ワンハンドローイング','インクラインベンチプレス','スミスマシン'],
-  toritsu: ['ラットプルダウン','シーテッドレッグプレス','ロー リアデルトイド','トーソローテーション','シーテッドレッグカール','ショルダープレス','アブドミナル','チェストプレス','ヒップアブダクター','レッグエクステンション','スミスマシン','ワンハンドローイング','インクラインベンチプレス'],
 };
 
 // --- STATE ---
-let currentGym = 'ontakesan';
+let currentGym = 'toritsu';
 let exercises = [];
 let timerInterval = null;
 let timerSec = 0;
@@ -1518,11 +1517,11 @@ function setFilter(id){
   renderDash();
 }
 
-async function generateAIAdvice(filtered, stagnant, all, bodyParts){
+function generateAIAdvice(filtered, stagnant, all, bodyParts){
   const aiContent = document.getElementById('aiContent');
   const aiUpdated = document.getElementById('aiUpdated');
-  aiContent.innerHTML = '<div class="ai-loading"><span style="display:inline-flex;width:16px;height:16px;flex-shrink:0;animation:spin 1s linear infinite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg></span> 次回メニューを考えています...</div>';
 
+  // プロンプトを生成
   const recentSessions = all.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,10);
   const sessionDetail = recentSessions.map(s=>{
     const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
@@ -1545,10 +1544,10 @@ async function generateAIAdvice(filtered, stagnant, all, bodyParts){
   });
   const gymExSummary = Object.entries(gymExMap).map(([g,set])=>g+'でよく使う種目: '+[...set].slice(0,6).join('、')).join('\n');
 
-  const prompt = `あなたは優秀なパーソナルトレーナーです。以下のトレーニング履歴を分析して、次回のトレーニングに向けた具体的なメニュー提案とアドバイスをJSONのみで返してください。
+  const prompt = `あなたは優秀なパーソナルトレーナーです。以下のトレーニング履歴を分析して、次回のトレーニングに向けた具体的なメニュー提案とアドバイスを日本語で教えてください。
 
 【ユーザープロフィール】
-週3回エニタイムフィットネス（自由が丘・御嶽山・都立大）
+週3回 エニタイムフィットネス（自由が丘・御嶽山・都立大の3拠点）
 目標: 姿勢改善、胸を厚くする、なで肩フォルム維持（ラテラルレイズは控えめ）、腕を太くする
 直近の拠点: ${lastGym}
 
@@ -1564,71 +1563,46 @@ ${balanceSummary}
 【停滞中の種目】
 ${stagnantNames}
 
-JSON形式のみで返してください（前置き・説明文・マークダウン一切不要）:
-{"nextMenu":{"gym":"次回おすすめ拠点名","reason":"理由20文字以内","exercises":[{"name":"種目名","weight":"推奨重量例:前回+2.5kg","sets":"3","priority":"high or normal"}]},"advices":[{"type":"miss or warn or ok","text":"25文字以内","detail":"35文字以内"}]}`;
+次回おすすめの拠点とメニュー（種目・推奨重量・セット数）、および現状へのアドバイスを具体的に教えてください。`;
 
-  try{
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6',
-        max_tokens:1500,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const data = await res.json();
-    const raw = data.content?.[0]?.text||'{}';
-    const clean = raw.replace(/```json?|```/g,'').trim();
-    const result = JSON.parse(clean);
+  // UIに表示
+  aiContent.innerHTML =
+    '<div style="margin-bottom:10px;font-size:12px;color:var(--text2);line-height:1.6">'+
+      'このボタンを押してClaude.aiに貼り付けてください。'+
+    '</div>'+
+    '<button onclick="copyPrompt()" id="copyBtn" style="width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:6px">'+
+      '<span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>'+
+      'プロンプトをコピー'+
+    '</button>'+
+    '<a href="https://claude.ai" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px;padding:9px;background:var(--bg);border:0.5px solid var(--border2);border-radius:10px;font-size:12px;color:var(--text3);text-decoration:none;font-family:var(--font)">'+
+      'Claude.aiを開く →'+
+    '</a>';
 
-    const typeColor = {miss:'#ff3b30',warn:'#ff9500',ok:'#34c759'};
-    const tagClass = {miss:'tag-miss',warn:'tag-warn',ok:'tag-ok'};
-    const typeTag = {miss:'不足',warn:'要注意',ok:'好調'};
+  // プロンプトをwindowに保存
+  window._currentPrompt = prompt;
 
-    let innerHtml = '';
-
-    if(result.nextMenu){
-      const m = result.nextMenu;
-      const gymObj = GYMS.find(g=>g.label===m.gym)||GYMS[0];
-      innerHtml += '<div style="margin-bottom:10px">'+
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">'+
-          '<span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">'+(gymObj.icon||'')+'</span>'+
-          '<span style="font-size:11px;font-weight:600;color:var(--text)">次回: '+m.gym+'</span>'+
-          '<span style="font-size:9px;color:var(--text4);margin-left:2px">'+m.reason+'</span>'+
-        '</div>'+
-        '<div style="display:flex;flex-direction:column;gap:4px">'+
-        (m.exercises||[]).map(ex=>{
-          const hi = ex.priority==='high';
-          return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:'+(hi?'rgba(94,92,230,0.06)':'var(--bg)')+';border-radius:8px;border:0.5px solid '+(hi?'rgba(94,92,230,0.2)':'transparent')+'">'
-            +'<span style="font-size:10px;font-weight:'+(hi?'600':'400')+';color:var(--text);flex:1">'+ex.name+'</span>'
-            +'<span style="font-size:9px;color:var(--text3);font-family:var(--mono)">'+ex.weight+'</span>'
-            +'<span style="font-size:9px;color:var(--text4);margin-left:3px">×'+ex.sets+'set</span>'
-            +'</div>';
-        }).join('')+
-        '</div></div>';
-    }
-
-    if(result.advices && result.advices.length){
-      innerHtml += '<div style="border-top:0.5px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px">'+
-        result.advices.map(a=>'<div class="ai-item">'+
-          '<div class="ai-dot" style="background:'+(typeColor[a.type]||'#8e8e93')+'"></div>'+
-          '<div class="ai-text"><strong>'+a.text+'</strong><span class="ai-tag '+(tagClass[a.type]||'')+'">'+typeTag[a.type]+'</span><br>'+a.detail+'</div>'+
-        '</div>').join('')+
-      '</div>';
-    }
-
-    aiContent.innerHTML = innerHtml || '<div style="font-size:12px;color:var(--text4)">データが不足しています</div>';
-    const now = new Date();
-    aiUpdated.textContent = now.getHours()+'時'+String(now.getMinutes()).padStart(2,'0')+'分更新';
-  } catch(e){
-    console.error('AI error:', e);
-    aiContent.innerHTML = '<div style="font-size:12px;color:var(--text4)">'+
-      'アドバイスの生成に失敗しました<br>'+
-      '<span style="font-size:10px;color:var(--text5)">'+e.message+'</span>'+
-    '</div>';
-  }
+  const now = new Date();
+  aiUpdated.textContent = now.getHours()+'時'+String(now.getMinutes()).padStart(2,'0')+'分更新';
 }
+
+function copyPrompt(){
+  if(!window._currentPrompt) return;
+  navigator.clipboard.writeText(window._currentPrompt).then(()=>{
+    const btn = document.getElementById('copyBtn');
+    if(btn){
+      btn.textContent = '✓ コピーしました';
+      btn.style.background = 'var(--green)';
+      setTimeout(()=>{
+        btn.innerHTML = '<span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>プロンプトをコピー';
+        btn.style.background = 'var(--accent)';
+      }, 2000);
+    }
+    showToast('コピーしました');
+  }).catch(()=>{
+    showToast('コピーに失敗しました');
+  });
+}
+
 async function renderHist(){
   const all = getDB().slice().reverse();
   document.getElementById('histSub').textContent = all.length+'回のトレーニング';
