@@ -122,10 +122,10 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 /* INPUT */
 .add-input-wrap{position:relative;margin-bottom:6px}
-.add-input{width:100%;background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 44px 10px 14px;font-size:16px;color:var(--text);font-family:var(--font);outline:none;transition:border-color 0.15s}
+.add-input{width:100%;background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 14px;font-size:16px;color:var(--text);font-family:var(--font);outline:none;transition:border-color 0.15s}
 .add-input:focus{border-color:var(--accent)}
 .add-input::placeholder{color:var(--text5)}
-.add-input-icon{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--text4);pointer-events:none;display:inline-flex}
+.add-input-icon{display:none}
 
 /* SUGGEST */
 .suggest-sheet{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px;display:none}
@@ -1392,7 +1392,6 @@ async function renderDash(){
     back:    {label:'背中',color:'#007aff',sets:0,target:12},
     leg:     {label:'脚',  color:'#34c759',sets:0,target:9},
     shoulder:{label:'肩',  color:'#ff9500',sets:0,target:6},
-    arm:     {label:'腕',  color:'#ff3b30',sets:0,target:6},
     core:    {label:'体幹',color:'#00c7be',sets:0,target:6},
   };
   recent.forEach(s=>s.exercises.forEach(e=>{
@@ -1520,45 +1519,54 @@ function setFilter(id){
   renderDash();
 }
 
-async function generateAIAdvice(exList, stagnant, allSessions){
+async function generateAIAdvice(filtered, stagnant, all, bodyParts){
   const aiContent = document.getElementById('aiContent');
   const aiUpdated = document.getElementById('aiUpdated');
-  aiContent.innerHTML = `<div class="ai-loading"><span class="spin-ico" style="display:inline-flex;width:16px;height:16px;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg></span></i>分析中...</div>`;
+  aiContent.innerHTML = '<div class="ai-loading"><span style="display:inline-flex;width:16px;height:16px;flex-shrink:0;animation:spin 1s linear infinite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg></span> 次回メニューを考えています...</div>';
 
-  const summary = exList.map(ex=>{
-    const vols = ex.sessions.map(s=>s.vol);
-    const last = vols[vols.length-1];
-    const prev = vols.length>=2?vols[vols.length-2]:null;
-    const delta = prev?last-prev:0;
-    const trend = delta>2?'伸びている':delta<-2?'落ちている':'停滞';
-    return `${ex.name}（${GYMS.find(g=>g.id===ex.gym)?.label||ex.gym}）: 総重量${last}kg, 前回比${delta>=0?'+':''}${delta}kg, 傾向:${trend}`;
+  const recentSessions = all.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,10);
+  const sessionDetail = recentSessions.map(s=>{
+    const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
+    const exList2 = s.exercises.map(e=>{
+      const maxW = Math.max(...e.sets.map(st=>st.weight));
+      return e.name+'(最大'+maxW+'kg×'+e.sets.length+'set)';
+    }).join(', ');
+    return s.date+' ['+gym+']: '+exList2;
   }).join('\n');
 
-  const missingArms = !exList.some(e=>
-    ['カール','トライセプス','アームカール','バイセップス'].some(k=>e.name.includes(k))
-  );
+  const lastGym = recentSessions.length>0 ? (GYMS.find(g=>g.id===recentSessions[0].gym)?.label||recentSessions[0].gym) : '不明';
+  const stagnantNames = stagnant.map(e=>e.name).join('、')||'なし';
+  const balanceSummary = bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+':'+b.sets+'set'+(b.sets<b.target*0.5?'(不足)':'(OK)')).join(', ') : '';
 
-  const prompt = `あなたはパーソナルトレーナーです。以下のデータを分析して、日本語で3つ以内の短いアドバイスをJSONで返してください。
+  const gymExMap = {};
+  all.forEach(s=>{
+    const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
+    if(!gymExMap[gym]) gymExMap[gym]=new Set();
+    s.exercises.forEach(e=>gymExMap[gym].add(e.name));
+  });
+  const gymExSummary = Object.entries(gymExMap).map(([g,set])=>g+'でよく使う種目: '+[...set].slice(0,6).join('、')).join('\n');
 
-【ユーザーの目標】
-- 姿勢改善（リアデルト・ロウイング系を週次確保）
-- 胸を厚くする（チェストプレス・ペックフライ必須）
-- なで肩フォルム（ラテラルレイズは控えめに）
-- 腕を太くする（カール・トライセプス系が不足しがち）
+  const prompt = `あなたは優秀なパーソナルトレーナーです。以下のトレーニング履歴を分析して、次回のトレーニングに向けた具体的なメニュー提案とアドバイスをJSONのみで返してください。
 
-【直近1ヶ月の種目別データ】
-${summary}
+【ユーザープロフィール】
+週3回エニタイムフィットネス（自由が丘・御嶽山・都立大）
+目標: 姿勢改善、胸を厚くする、なで肩フォルム維持（ラテラルレイズは控えめ）、腕を太くする
+直近の拠点: ${lastGym}
+
+【直近10セッションの履歴】
+${sessionDetail}
+
+【拠点別の種目リスト】
+${gymExSummary}
+
+【今月の部位バランス】
+${balanceSummary}
 
 【停滞中の種目】
-${stagnant.map(e=>e.name).join('、')||'なし'}
+${stagnantNames}
 
-腕系の記録: ${missingArms?'なし（要追加）':'あり'}
-
-【部位別セット数 vs 目標】
-${bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+': '+b.sets+'セット（目標'+b.target+'以上）'+(b.sets<b.target*0.5?'★不足':'')).join(', ') : ''}
-
-以下のJSON形式のみで返してください（説明文不要）:
-[{"type":"miss|warn|ok","text":"アドバイス文（30文字以内）","detail":"詳細（40文字以内）"}]`;
+JSON形式のみで返してください（前置き・説明文・マークダウン一切不要）:
+{"nextMenu":{"gym":"次回おすすめ拠点名","reason":"理由20文字以内","exercises":[{"name":"種目名","weight":"推奨重量例:前回+2.5kg","sets":"3","priority":"high or normal"}]},"advices":[{"type":"miss or warn or ok","text":"25文字以内","detail":"35文字以内"}]}`;
 
   try{
     const res = await fetch('https://api.anthropic.com/v1/messages',{
@@ -1566,33 +1574,59 @@ ${bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+': '+b.sets+'セッ
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-6',
-        max_tokens:1000,
+        max_tokens:1500,
         messages:[{role:'user',content:prompt}]
       })
     });
     const data = await res.json();
-    const raw = data.content?.[0]?.text||'[]';
+    const raw = data.content?.[0]?.text||'{}';
     const clean = raw.replace(/```json?|```/g,'').trim();
-    const advices = JSON.parse(clean);
+    const result = JSON.parse(clean);
 
     const typeColor = {miss:'#ff3b30',warn:'#ff9500',ok:'#34c759'};
-    const typeTag = {miss:'不足',warn:'停滞',ok:'好調'};
     const tagClass = {miss:'tag-miss',warn:'tag-warn',ok:'tag-ok'};
+    const typeTag = {miss:'不足',warn:'要注意',ok:'好調'};
 
-    aiContent.innerHTML = `<div class="ai-items">${advices.map(a=>`
-      <div class="ai-item">
-        <div class="ai-dot" style="background:${typeColor[a.type]||'#8e8e93'}"></div>
-        <div class="ai-text"><strong>${a.text}</strong><span class="ai-tag ${tagClass[a.type]||''}">${typeTag[a.type]||''}</span><br>${a.detail}</div>
-      </div>`).join('')}</div>`;
+    let innerHtml = '';
 
+    if(result.nextMenu){
+      const m = result.nextMenu;
+      const gymObj = GYMS.find(g=>g.label===m.gym)||GYMS[0];
+      innerHtml += '<div style="margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">'+
+          '<span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">'+(gymObj.icon||'')+'</span>'+
+          '<span style="font-size:11px;font-weight:600;color:var(--text)">次回: '+m.gym+'</span>'+
+          '<span style="font-size:9px;color:var(--text4);margin-left:2px">'+m.reason+'</span>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:4px">'+
+        (m.exercises||[]).map(ex=>{
+          const hi = ex.priority==='high';
+          return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:'+(hi?'rgba(94,92,230,0.06)':'var(--bg)')+';border-radius:8px;border:0.5px solid '+(hi?'rgba(94,92,230,0.2)':'transparent')+'">'
+            +'<span style="font-size:10px;font-weight:'+(hi?'600':'400')+';color:var(--text);flex:1">'+ex.name+'</span>'
+            +'<span style="font-size:9px;color:var(--text3);font-family:var(--mono)">'+ex.weight+'</span>'
+            +'<span style="font-size:9px;color:var(--text4);margin-left:3px">×'+ex.sets+'set</span>'
+            +'</div>';
+        }).join('')+
+        '</div></div>';
+    }
+
+    if(result.advices && result.advices.length){
+      innerHtml += '<div style="border-top:0.5px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:6px">'+
+        result.advices.map(a=>'<div class="ai-item">'+
+          '<div class="ai-dot" style="background:'+(typeColor[a.type]||'#8e8e93')+'"></div>'+
+          '<div class="ai-text"><strong>'+a.text+'</strong><span class="ai-tag '+(tagClass[a.type]||'')+'">'+typeTag[a.type]+'</span><br>'+a.detail+'</div>'+
+        '</div>').join('')+
+      '</div>';
+    }
+
+    aiContent.innerHTML = innerHtml || '<div style="font-size:12px;color:var(--text4)">データが不足しています</div>';
     const now = new Date();
-    aiUpdated.textContent = (now.getHours())+'時'+(now.getMinutes())+'分更新';
+    aiUpdated.textContent = now.getHours()+'時'+String(now.getMinutes()).padStart(2,'0')+'分更新';
   } catch(e){
-    aiContent.innerHTML = `<div class="ai-loading" style="color:var(--text4)"><span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="8.5"/><line x1="12" y1="11" x2="12" y2="16"/></svg></span></i> データが不足しています。トレーニングを記録してください。</div>`;
+    console.error('AI error:', e);
+    aiContent.innerHTML = '<div style="font-size:12px;color:var(--text4)">アドバイスの生成に失敗しました</div>';
   }
 }
-
-// --- HISTORY ---
 async function renderHist(){
   const all = getDB().slice().reverse();
   document.getElementById('histSub').textContent = all.length+'回のトレーニング';
