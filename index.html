@@ -424,7 +424,6 @@ document.head.appendChild(link);
     <div class="add-input-wrap">
       <input class="add-input" id="addInput" placeholder="種目を追加..." autocomplete="off"
         onfocus="showSuggest()" oninput="filterSuggest()" onkeydown="onInputKey(event)">
-      <span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/></svg></span></i>
     </div>
     <div class="suggest-sheet" id="suggestSheet"></div>
     <div id="exList"></div>
@@ -1624,7 +1623,10 @@ JSON形式のみで返してください（前置き・説明文・マークダ�
     aiUpdated.textContent = now.getHours()+'時'+String(now.getMinutes()).padStart(2,'0')+'分更新';
   } catch(e){
     console.error('AI error:', e);
-    aiContent.innerHTML = '<div style="font-size:12px;color:var(--text4)">アドバイスの生成に失敗しました</div>';
+    aiContent.innerHTML = '<div style="font-size:12px;color:var(--text4)">'+
+      'アドバイスの生成に失敗しました<br>'+
+      '<span style="font-size:10px;color:var(--text5)">'+e.message+'</span>'+
+    '</div>';
   }
 }
 async function renderHist(){
