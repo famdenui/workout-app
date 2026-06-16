@@ -355,7 +355,8 @@ document.head.appendChild(link);
         </defs>
         <circle cx="100" cy="100" r="88" fill="none" stroke="#e5e5ea" stroke-width="7"/>
         <circle id="ringProgress" cx="100" cy="100" r="88" fill="none" stroke="url(#ringGrad)" stroke-width="7"
-          stroke-dasharray="552.9" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 100 100)"/>
+          stroke-dasharray="552.9" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 100 100)"
+          style="transition:stroke-dashoffset 1s linear"/>
         <circle cx="100" cy="12" r="3.5" fill="#d1d1d6"/>
         <circle cx="188" cy="100" r="3.5" fill="#d1d1d6"/>
         <circle cx="100" cy="188" r="3.5" fill="#d1d1d6"/>
@@ -1232,6 +1233,23 @@ function startTimer(ei, si){
   timerInterval = setInterval(tickTimer, 1000);
 }
 
+// Web Audio APIでビープ音を生成
+function beep(freq, duration, volume){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(volume||0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  }catch(e){}
+}
+
 function tickTimer(){
   timerSec--;
   if(timerSec <= 0){
@@ -1241,9 +1259,15 @@ function tickTimer(){
     rt.textContent = 'GO!';
     rt.className = 'ring-time done';
     document.getElementById('ringSub').textContent = 'インターバル終了';
-    try{ new Audio('data:audio/wav;base64,UklGRl9vT14=').play(); }catch(e){}
-    setTimeout(()=>{ skipTimer(); }, 2000);
+    // 終了音（高め・長め）
+    beep(880, 0.4, 0.5);
+    setTimeout(()=>beep(1100, 0.3, 0.4), 200);
+    setTimeout(()=>{ skipTimer(); }, 2500);
     return;
+  }
+  // 残り3秒カウントダウン音
+  if(timerSec <= 3){
+    beep(660, 0.15, 0.3);
   }
   updateTimerUI();
 }
@@ -1579,9 +1603,12 @@ ${stagnantNames}
       '<span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span>'+
       'プロンプトをコピー'+
     '</button>'+
-    '<a href="https://claude.ai" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px;padding:9px;background:var(--bg);border:0.5px solid var(--border2);border-radius:10px;font-size:12px;color:var(--text3);text-decoration:none;font-family:var(--font)">'+
-      'Claude.aiを開く →'+
-    '</a>';
+    '<div style="display:flex;gap:6px;margin-top:6px">'+
+      '<a href="https://claude.ai/new" target="_blank" rel="noopener noreferrer" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px;background:var(--bg);border:0.5px solid var(--border2);border-radius:10px;font-size:12px;color:var(--text3);text-decoration:none;font-family:var(--font)">'+
+        '<span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span>'+
+        'Claudeで開く（新しいタブ）'+
+      '</a>'+
+    '</div>';
 
   // プロンプトをwindowに保存
   window._currentPrompt = prompt;
