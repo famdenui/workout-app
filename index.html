@@ -33,6 +33,10 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 
 
+
+/* CHART TOOLTIP */
+.chart-tooltip{position:fixed;background:var(--text);color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;pointer-events:none;z-index:500;white-space:nowrap;transform:translate(-50%,-110%);font-family:var(--font);line-height:1.5;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+
 /* NEW EXERCISE MODAL */
 .new-ex-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:260;display:none;align-items:flex-end;justify-content:center}
 .new-ex-overlay.on{display:flex}
@@ -536,6 +540,7 @@ document.head.appendChild(link);
   <div class="install-banner-close" onclick="dismissBanner()">×</div>
 </div>
 
+<div class="chart-tooltip" id="chartTooltip" style="display:none"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1507,13 +1512,15 @@ async function renderDash(){
     const gym = GYMS.find(g=>g.id===ex.gym);
     const {icon, color, lightColor} = getIconWithColor(ex.name);
     const max=Math.max(...vols), min=Math.min(...vols,0), range=max-min||1;
-    const pts = vols.map((v,i)=>{
-      const x=vols.length===1?170:(i/(vols.length-1))*170;
-      const y=32-((v-min)/range)*28;
-      return x.toFixed(1)+','+y.toFixed(1);
-    }).join(' ');
-    const lx=vols.length===1?170:((vols.length-1)/(vols.length-1))*170;
-    const ly=32-((vols[vols.length-1]-min)/range)*28;
+    const datePts = vols.map((v,i)=>{
+      const x=vols.length===1?160:(i/(vols.length-1))*160+5;
+      const y=32-((v-min)/range)*26;
+      return {x,y};
+    });
+    const ptsShifted = datePts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+    const pts = ptsShifted;
+    const lx=datePts[datePts.length-1]?.x||160;
+    const ly=datePts[datePts.length-1]?.y||6;
     const lineColor=trend==='up'?'#34c759':trend==='dn'?'#ff3b30':'#aeaeb2';
     const cgId='cg_'+ex.name.replace(/[^a-zA-Z0-9]/g,'_')+'_'+ex.gym;
 
@@ -1534,15 +1541,25 @@ async function renderDash(){
           '<div class="epc-delta '+trend+'">'+trendStr+'</div>'+
         '</div>'+
       '</div>'+
-      '<div class="epc-chart">'+
-        '<svg viewBox="0 0 170 36" preserveAspectRatio="none">'+
+      '<div class="epc-chart" style="position:relative">'+
+        '<svg viewBox="0 0 170 44" preserveAspectRatio="none" style="width:100%;height:52px">'+
           '<defs><linearGradient id="'+cgId+'" x1="0" y1="0" x2="0" y2="1">'+
-            '<stop offset="0%" stop-color="'+lineColor+'" stop-opacity="0.12"/>'+
+            '<stop offset="0%" stop-color="'+lineColor+'" stop-opacity="0.15"/>'+
             '<stop offset="100%" stop-color="'+lineColor+'" stop-opacity="0"/>'+
           '</linearGradient></defs>'+
-          '<polyline points="'+pts+' '+lx.toFixed(1)+',36 0,36" fill="url(#'+cgId+')" stroke="none"/>'+
-          '<polyline points="'+pts+'" fill="none" stroke="'+lineColor+'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'+
-          '<circle cx="'+lx.toFixed(1)+'" cy="'+ly.toFixed(1)+'" r="3" fill="'+lineColor+'"/>'+
+          // グリッドライン
+          '<line x1="0" y1="8" x2="170" y2="8" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>'+
+          '<line x1="0" y1="24" x2="170" y2="24" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>'+
+          '<polyline points="'+ptsShifted+' '+lx.toFixed(1)+',40 0,40" fill="url(#'+cgId+')" stroke="none"/>'+
+          '<polyline points="'+ptsShifted+'" fill="none" stroke="'+lineColor+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'+
+          // 各データポイントにタッチ対応の円を描画
+          datePts.map((p,i)=>{
+            const isLast = i===datePts.length-1;
+            return '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(isLast?4:3)+'" fill="'+(isLast?lineColor:'var(--surface)')+'" stroke="'+lineColor+'" stroke-width="1.5" style="cursor:pointer" onclick="showChartTooltip(event,\''+ex.name+'\',\''+ex.sessions[i].date+'\','+ex.sessions[i].vol+')"/>'+
+            // 最初と最後に日付ラベル
+            (i===0 ? '<text x="'+p.x.toFixed(1)+'" y="43" font-size="7" fill="var(--text4)" font-family="var(--font)" text-anchor="start">'+ex.sessions[i].date.slice(5).replace('-','/')+'</text>' : '')+
+            (isLast ? '<text x="'+p.x.toFixed(1)+'" y="43" font-size="7" fill="var(--text4)" font-family="var(--font)" text-anchor="end">'+ex.sessions[i].date.slice(5).replace('-','/')+'</text>' : '');
+          }).join('')+
         '</svg>'+
       '</div>'+
     '</div>';
@@ -1710,6 +1727,26 @@ function dismissBanner(){
   document.getElementById('installBanner').style.display = 'none';
   localStorage.setItem('wt_banner_dismissed', '1');
 }
+
+
+// --- CHART TOOLTIP ---
+let tooltipTimer = null;
+function showChartTooltip(e, name, date, vol){
+  const tt = document.getElementById('chartTooltip');
+  const d = new Date(date);
+  const days = ['日','月','火','水','木','金','土'];
+  const dateStr = (d.getMonth()+1)+'月'+d.getDate()+'日（'+days[d.getDay()]+'）';
+  tt.innerHTML = dateStr+'<br><strong>'+vol.toLocaleString()+'kg</strong>';
+  tt.style.display = 'block';
+  tt.style.left = e.clientX+'px';
+  tt.style.top = e.clientY+'px';
+  clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(()=>{ tt.style.display='none'; }, 2500);
+  e.stopPropagation();
+}
+document.addEventListener('click', ()=>{
+  document.getElementById('chartTooltip').style.display='none';
+});
 
 // --- SETTINGS / GYM MANAGEMENT ---
 const GYM_COLORS = ['#5e5ce6','#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#00c7be'];
