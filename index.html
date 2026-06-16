@@ -1379,8 +1379,8 @@ async function doSave(){
 async function renderDash(){
   const all = getDB();
   const now = new Date();
-  const oneMonthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
-  const recent = all.filter(s=>new Date(s.date)>=oneMonthAgo);
+  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth()-2, 1);
+  const recent = all.filter(s=>new Date(s.date)>=threeMonthsAgo);
 
   const total = recent.length;
   let totalVol = 0;
@@ -1407,12 +1407,12 @@ async function renderDash(){
   document.getElementById('topStats').innerHTML =
     '<div class="stat-card" style="background:#f5f4ff;border-color:rgba(94,92,230,0.15)">'+
       '<div class="stat-val">'+total+'<span class="stat-unit">回</span></div>'+
-      '<div class="stat-lbl">今月のトレーニング</div>'+
-      '<div class="stat-trend up">今月'+daysInMonth+'日間</div>'+
+      '<div class="stat-lbl">直近3ヶ月</div>'+
+      '<div class="stat-trend up">トレーニング数</div>'+
     '</div>'+
     '<div class="stat-card" style="background:#f0fff4;border-color:rgba(52,199,89,0.15)">'+
       '<div class="stat-val">'+volStr+'</div>'+
-      '<div class="stat-lbl">今月の総ボリューム</div>'+
+      '<div class="stat-lbl">直近3ヶ月の総ボリューム</div>'+
       '<div class="stat-trend up">重量×レップ×セット</div>'+
     '</div>'+
     '<div class="stat-card" style="background:#edf6ff;border-color:rgba(0,122,255,0.15)">'+
