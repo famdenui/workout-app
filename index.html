@@ -1454,10 +1454,10 @@ async function renderDash(){
     const valColor = warn ? '#ff3b30' : 'var(--text4)';
     balHtml += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
       '<div style="font-size:9px;color:var(--text3);width:22px;flex-shrink:0">'+b.label+'</div>'+
-      '<div style="flex:1;height:6px;background:var(--bg);border-radius:99px;overflow:hidden">'+
+      '<div style="flex:1;height:10px;background:var(--bg);border-radius:99px;overflow:hidden">'+
         '<div style="height:100%;width:'+pct+'%;background:'+b.color+';border-radius:99px"></div>'+
       '</div>'+
-      '<div style="font-size:9px;color:'+valColor+';font-weight:'+(warn?'600':'400')+';width:30px;text-align:right;font-family:var(--mono)">'+b.sets+(warn?'⚠':'')+'</div>'+
+      '<div style="font-size:15px;color:'+valColor+';font-weight:'+(warn?'700':'600')+';width:40px;text-align:right;font-family:var(--mono)">'+b.sets+(warn?'⚠':'')+'</div>'+
     '</div>';
   });
   balanceCard.innerHTML = balHtml;
