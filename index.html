@@ -1345,9 +1345,15 @@ function closeModal(){
 
 async function doSave(){
   closeModal();
+  const now2 = new Date();
+  // 選択日付が今日なら正確な時刻、過去日付なら12:00とする
+  const sessionDateTime = selectedDate === today()
+    ? now2.toISOString()
+    : selectedDate + 'T12:00:00.000Z';
   const session = {
     id: Date.now(),
     date: selectedDate,
+    datetime: sessionDateTime,
     gym: currentGym,
     exercises: exercises.map(e=>({
       name: e.name,
@@ -1380,7 +1386,11 @@ async function renderDash(){
   let daysSince = '—';
   let hoursSince = '—';
   if(lastSession){
-    const diffMs = now - new Date(lastSession.date);
+    // datetimeがあれば正確な時刻、なければ日付の12:00を使用
+    const lastDt = lastSession.datetime
+      ? new Date(lastSession.datetime)
+      : new Date(lastSession.date + 'T12:00:00');
+    const diffMs = now - lastDt;
     daysSince = Math.floor(diffMs / (1000*60*60*24));
     hoursSince = Math.floor(diffMs / (1000*60*60));
   }
