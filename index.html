@@ -1582,11 +1582,30 @@ function generateAIAdvice(filtered, stagnant, all, bodyParts){
   const sessionDetail = recentSessions.map(s=>{
     const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
     const exList2 = s.exercises.map(e=>{
-      const maxW = Math.max(...e.sets.map(st=>st.weight));
-      return e.name+'(最大'+maxW+'kg×'+e.sets.length+'set)';
+      const setStr = e.sets.map(st=>st.weight+'kg×'+st.reps+'rep').join(' / ');
+      const totalVol = e.sets.reduce((a,st)=>a+st.weight*st.reps,0);
+      return e.name+'['+setStr+'] 総量:'+totalVol+'kg';
     }).join(', ');
     return s.date+' ['+gym+']: '+exList2;
   }).join('\n');
+
+  // 種目ごとのレップ数推移を計算
+  const repTrends = {};
+  recentSessions.slice().reverse().forEach(s=>{
+    s.exercises.forEach(e=>{
+      if(!repTrends[e.name]) repTrends[e.name]=[];
+      const avgRep = e.sets.reduce((a,st)=>a+st.reps,0)/e.sets.length;
+      const maxW = Math.max(...e.sets.map(st=>st.weight));
+      repTrends[e.name].push({date:s.date, maxW, avgRep: avgRep.toFixed(1)});
+    });
+  });
+  const repTrendSummary = Object.entries(repTrends).map(([name,arr])=>{
+    if(arr.length<2) return null;
+    const first = arr[0], last = arr[arr.length-1];
+    const wDiff = last.maxW - first.maxW;
+    const rDiff = parseFloat(last.avgRep) - parseFloat(first.avgRep);
+    return name+': 重量'+( wDiff>0?'+':'')+wDiff+'kg, レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
+  }).filter(Boolean).join('\n');
 
   const lastGym = recentSessions.length>0 ? (GYMS.find(g=>g.id===recentSessions[0].gym)?.label||recentSessions[0].gym) : '不明';
   const stagnantNames = stagnant.map(e=>e.name).join('、')||'なし';
@@ -1615,6 +1634,9 @@ ${gymExSummary}
 
 【今月の部位バランス】
 ${balanceSummary}
+
+【種目別の重量・レップ数の推移（直近3ヶ月）】
+${repTrendSummary||'データなし'}
 
 【停滞中の種目】
 ${stagnantNames}
