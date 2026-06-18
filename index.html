@@ -1239,9 +1239,25 @@ function startTimer(ei, si){
 }
 
 // Web Audio APIでビープ音を生成
+// AudioContextをシングルトンで管理（iOSはユーザー操作後に初期化）
+let _audioCtx = null;
+function getAudioCtx(){
+  if(!_audioCtx){
+    try{
+      _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    }catch(e){ return null; }
+  }
+  // iOSでsuspendedの場合はresumeが必要
+  if(_audioCtx.state === 'suspended'){
+    _audioCtx.resume();
+  }
+  return _audioCtx;
+}
+
 function beep(freq, duration, volume){
   try{
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const ctx = getAudioCtx();
+    if(!ctx) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
@@ -1252,7 +1268,12 @@ function beep(freq, duration, volume){
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + duration);
-  }catch(e){}
+  }catch(e){ console.warn('beep error:', e); }
+}
+
+// ユーザー操作時にAudioContextを初期化（iOSの制限対策）
+function initAudio(){
+  getAudioCtx();
 }
 
 function tickTimer(){
@@ -1351,10 +1372,14 @@ function closeModal(){
 async function doSave(){
   closeModal();
   const now2 = new Date();
-  // 選択日付が今日なら正確な時刻、過去日付なら12:00とする
+  // 選択日付が今日なら正確な時刻（ローカル時刻）、過去日付なら12:00とする
+  function toLocalISO(d){
+    const pad = n=>String(n).padStart(2,'0');
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  }
   const sessionDateTime = selectedDate === today()
-    ? now2.toISOString()
-    : selectedDate + 'T12:00:00.000Z';
+    ? toLocalISO(now2)
+    : selectedDate + 'T12:00:00';
   const session = {
     id: Date.now(),
     date: selectedDate,
@@ -1392,6 +1417,7 @@ async function renderDash(){
   let hoursSince = '—';
   if(lastSession){
     // datetimeがあれば正確な時刻、なければ日付の12:00を使用
+    // datetimeがローカル時刻文字列の場合はそのままDate化（タイムゾーン付与しない）
     const lastDt = lastSession.datetime
       ? new Date(lastSession.datetime)
       : new Date(lastSession.date + 'T12:00:00');
@@ -1622,9 +1648,23 @@ function generateAIAdvice(filtered, stagnant, all, bodyParts){
   const prompt = `あなたは優秀なパーソナルトレーナーです。以下のトレーニング履歴を分析して、次回のトレーニングに向けた具体的なメニュー提案とアドバイスを日本語で教えてください。
 
 【ユーザープロフィール】
-週3回 エニタイムフィットネス（自由が丘・御嶽山・都立大の3拠点）
+週3回 エニタイムフィットネス通い（3拠点）
 目標: 姿勢改善、胸を厚くする、なで肩フォルム維持（ラテラルレイズは控えめ）、腕を太くする
 直近の拠点: ${lastGym}
+※御嶽山は基本的に土曜日のみ利用
+
+【各拠点の設備】
+■ 都立大（メイン拠点・平日）
+マシン: チェストプレス、アイソラテラルチェストプレス、ショルダープレス、プルダウン、ロー/リアデルトイド、アイソラテラルフロントラットプルダウン、バックエクステンション、レッグプレス、シーテッドレッグプレス、シーテッドレッグカール、レッグエクステンション、アブダクター/アダクター、アブドミナル、トーソローテーション
+フリーウェイト: パワーラック2台、ハーフラック1台、スミスマシン1台、リニアレッグプレス、ダンベル1-40kg、ケーブル
+
+■ 自由が丘（平日）
+マシン: レッグプレス、レッグエクステンション/カール、インナーサイ/アウターサイ、チェストプレス、ペックフライ/リアデルト、ショルダープレス、ラテラルレイズ、ラットプルダウン、ダイバージングシーテッドロー、アブドミナル、ロータリートルソー
+フリーウェイト: パワーラック2台、ハーフラック1台、スミスマシン1台、ダンベル1-40kg、デュアルアジャスタブルプーリー
+
+■ 御嶽山（土曜のみ）
+マシン: ラットプルダウン、ダイバージングロー、チェストプレス、ショルダープレス、ペックフライ、レッグプレス、ライイングレッグカール、レッグエクステンション
+フリーウェイト: スミスマシン2台、パワーラック1台、ハーフラック2台、ダンベル〜50kg
 
 【直近10セッションの履歴】
 ${sessionDetail}
