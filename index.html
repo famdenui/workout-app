@@ -219,11 +219,11 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 
 /* DASHBOARD */
 .top-stats{display:flex;gap:6px;margin-bottom:12px}
-.stat-card{flex:1;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 10px}
-.stat-val{font-size:20px;font-weight:500;color:var(--text);letter-spacing:-0.5px;font-family:var(--mono);line-height:1}
+.stat-card{flex:1;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:13px 13px}
+.stat-val{font-size:24px;font-weight:500;color:var(--text);letter-spacing:-0.6px;font-family:var(--mono);line-height:1}
 .stat-unit{font-size:10px;color:var(--text4)}
-.stat-lbl{font-size:10px;color:var(--text3);margin-top:4px}
-.stat-trend{font-size:10px;font-weight:500;margin-top:3px}
+.stat-lbl{font-size:11px;color:var(--text3);margin-top:6px}
+.stat-trend{font-size:11px;font-weight:600;margin-top:3px}
 .stat-trend.up{color:var(--green)}
 .stat-trend.flat{color:var(--text4)}
 .stat-trend.dn{color:var(--red)}
@@ -458,6 +458,7 @@ document.head.appendChild(link);
   </div>
 
   <!-- 履歴 -->
+
   <div class="screen" id="screen-hist">
     <div class="page-title">履歴</div>
     <div class="page-sub" id="histSub">—</div>
@@ -1440,21 +1441,6 @@ async function renderDash(){
   const paceWeekly = total>0 && pace!=='—' ? '週'+(7/parseFloat(pace)).toFixed(1)+'回' : '記録なし';
 
   document.getElementById('topStats').innerHTML =
-    '<div class="stat-card" style="background:#f5f4ff;border-color:rgba(94,92,230,0.15)">'+
-      '<div class="stat-val">'+total+'<span class="stat-unit">回</span></div>'+
-      '<div class="stat-lbl">直近3ヶ月</div>'+
-      '<div class="stat-trend up">トレーニング数</div>'+
-    '</div>'+
-    '<div class="stat-card" style="background:#f0fff4;border-color:rgba(52,199,89,0.15)">'+
-      '<div class="stat-val">'+volStr+'</div>'+
-      '<div class="stat-lbl">直近3ヶ月の総ボリューム</div>'+
-      '<div class="stat-trend up">重量×レップ×セット</div>'+
-    '</div>'+
-    '<div class="stat-card" style="background:#edf6ff;border-color:rgba(0,122,255,0.15)">'+
-      '<div class="stat-val">'+pace+'<span class="stat-unit">日/回</span></div>'+
-      '<div class="stat-lbl">平均ペース</div>'+
-      '<div class="stat-trend ok">'+paceWeekly+'ペース</div>'+
-    '</div>'+
     '<div class="stat-card" style="background:#fff9f0;border-color:rgba(255,159,10,0.15)">'+
       '<div style="display:flex;align-items:baseline;gap:6px">'+
         '<div class="stat-val">'+daysSince+'<span class="stat-unit">'+(daysSince!=='—'?'日':'')+'</span></div>'+
@@ -1462,6 +1448,12 @@ async function renderDash(){
       '</div>'+
       '<div class="stat-lbl">前回から経過</div>'+
       '<div class="stat-trend" style="color:'+daysSinceColor+'">'+daysSinceLabel+'</div>'+
+    '</div>'+
+    '<div class="stat-card" style="background:#edf6ff;border-color:rgba(0,122,255,0.15)">'+
+      '<div class="stat-val">'+pace+'<span class="stat-unit">日/回</span></div>'+
+      '<div class="stat-lbl">平均ペース</div>'+
+      '<div class="stat-trend ok">'+paceWeekly+'ペース</div>'+
+    '</div>';
     '</div>';
 
   const bodyParts = {
@@ -1507,7 +1499,6 @@ async function renderDash(){
     GYMS.map(g=>'<div class="filter-chip'+(currentFilter===g.id?' on':'')+'" onclick="setFilter(\''+g.id+'\')">'+g.label+'</div>').join('');
 
   const exMap = {};
-  // 日付順にソートしてから集計
   const recentSorted = [...recent].sort((a,b)=>new Date(a.date)-new Date(b.date));
   for(const s of recentSorted){
     for(const ex of s.exercises){
@@ -1582,16 +1573,13 @@ async function renderDash(){
             '<stop offset="0%" stop-color="'+lineColor+'" stop-opacity="0.15"/>'+
             '<stop offset="100%" stop-color="'+lineColor+'" stop-opacity="0"/>'+
           '</linearGradient></defs>'+
-          // グリッドライン
           '<line x1="0" y1="8" x2="170" y2="8" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>'+
           '<line x1="0" y1="24" x2="170" y2="24" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>'+
           '<polyline points="'+ptsShifted+' '+lx.toFixed(1)+',40 0,40" fill="url(#'+cgId+')" stroke="none"/>'+
           '<polyline points="'+ptsShifted+'" fill="none" stroke="'+lineColor+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'+
-          // 各データポイントにタッチ対応の円を描画
           datePts.map((p,i)=>{
             const isLast = i===datePts.length-1;
             return '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="'+(isLast?4:3)+'" fill="'+(isLast?lineColor:'var(--surface)')+'" stroke="'+lineColor+'" stroke-width="1.5" style="cursor:pointer" onclick="showChartTooltip(event,\''+ex.name+'\',\''+ex.sessions[i].date+'\','+ex.sessions[i].vol+')"/>'+
-            // 最初と最後に日付ラベル
             (i===0 ? '<text x="'+p.x.toFixed(1)+'" y="43" font-size="7" fill="var(--text4)" font-family="var(--font)" text-anchor="start">'+ex.sessions[i].date.slice(5).replace('-','/')+'</text>' : '')+
             (isLast ? '<text x="'+p.x.toFixed(1)+'" y="43" font-size="7" fill="var(--text4)" font-family="var(--font)" text-anchor="end">'+ex.sessions[i].date.slice(5).replace('-','/')+'</text>' : '');
           }).join('')+
