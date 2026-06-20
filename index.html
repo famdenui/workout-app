@@ -344,10 +344,13 @@ document.head.appendChild(link);
 <!-- TIMER FULLSCREEN -->
 <div class="timer-screen" id="timerScreen">
   <div class="timer-top">
-    <div class="timer-ctx" id="timerCtx">—</div>
+    <div class="timer-back" onclick="minimizeTimer()" style="display:flex;align-items:center;gap:4px;color:var(--accent);font-size:13px;font-weight:500;cursor:pointer;touch-action:manipulation">
+      <span style="display:inline-flex;width:16px;height:16px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></span>記録に戻る
+    </div>
     <div class="timer-skip" onclick="skipTimer()">スキップ</div>
   </div>
   <div class="timer-center">
+    <div class="timer-ctx" id="timerCtx" style="font-size:13px;color:var(--text3);margin-bottom:6px">—</div>
     <div class="timer-label">INTERVAL</div>
     <div class="ring-container">
       <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -1290,6 +1293,7 @@ function tickTimer(){
     // 終了音（高め・長め）
     beep(880, 0.4, 0.5);
     setTimeout(()=>beep(1100, 0.3, 0.4), 200);
+    hideFloatingTimer();
     setTimeout(()=>{ skipTimer(); }, 2500);
     return;
   }
@@ -1298,6 +1302,7 @@ function tickTimer(){
     beep(660, 0.15, 0.3);
   }
   updateTimerUI();
+  updateFloatingTimer();
 }
 
 function updateTimerUI(){
@@ -1356,6 +1361,36 @@ function skipTimer(){
   clearInterval(timerInterval);
   timerRunning = false;
   document.getElementById('timerScreen').classList.remove('on');
+  hideFloatingTimer();
+}
+
+// タイマーを止めずに画面だけ閉じて記録画面に戻る
+function minimizeTimer(){
+  document.getElementById('timerScreen').classList.remove('on');
+  if(timerRunning) showFloatingTimer();
+}
+
+function showFloatingTimer(){
+  let fab = document.getElementById('timerFab');
+  if(!fab){
+    fab = document.createElement('div');
+    fab.id = 'timerFab';
+    fab.onclick = ()=>{ document.getElementById('timerScreen').classList.add('on'); hideFloatingTimer(); };
+    fab.style.cssText = 'position:fixed;bottom:78px;right:16px;background:var(--accent);color:#fff;border-radius:99px;padding:10px 16px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(94,92,230,0.35);z-index:150;cursor:pointer;touch-action:manipulation;font-family:var(--font);max-width:calc(430px - 32px)';
+    document.body.appendChild(fab);
+  }
+  fab.innerHTML = '<span style="display:inline-flex;width:14px;height:14px;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span><span id="timerFabTime" style="font-size:13px;font-weight:600;font-family:var(--mono)">'+fmtSec(timerSec)+'</span>';
+  fab.style.display = 'flex';
+}
+
+function hideFloatingTimer(){
+  const fab = document.getElementById('timerFab');
+  if(fab) fab.style.display = 'none';
+}
+
+function updateFloatingTimer(){
+  const el = document.getElementById('timerFabTime');
+  if(el) el.textContent = fmtSec(timerSec);
 }
 
 // --- SAVE ---
