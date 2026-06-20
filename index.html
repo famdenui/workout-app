@@ -5,12 +5,12 @@
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="トレーニング">
+<meta name="apple-mobile-web-app-title" content="Workout">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e1b4b">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%231e1b4b'/><stop offset='100%25' stop-color='%235e5ce6'/></linearGradient></defs><rect width='100' height='100' fill='url(%23g)'/><rect x='14' y='46' width='72' height='8' rx='4' fill='rgba(255,255,255,0.15)'/><rect x='14' y='42' width='12' height='16' rx='4' fill='rgba(255,255,255,0.9)'/><rect x='74' y='42' width='12' height='16' rx='4' fill='rgba(255,255,255,0.9)'/><rect x='22' y='36' width='9' height='28' rx='3.5' fill='white'/><rect x='69' y='36' width='9' height='28' rx='3.5' fill='white'/><polyline points='28,80 43,67 57,71 74,56' fill='none' stroke='%2334c759' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/><circle cx='74' cy='56' r='4.5' fill='%2334c759'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>トレーニング</title>
+<title>Workout</title>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -317,8 +317,8 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 <script>
 // PWA manifest インライン注入
 const manifest = {
-  name: 'トレーニング',
-  short_name: 'トレーニング',
+  name: 'Workout',
+  short_name: 'Workout',
   display: 'standalone',
   background_color: '#f2f2f7',
   theme_color: '#5e5ce6',
@@ -1151,6 +1151,7 @@ function addSet(ei){
 }
 
 function completeSet(ei, si){
+  initAudio(); // iOSのAudioContext初期化（ユーザー操作直後に呼ぶ必要がある）
   const set = exercises[ei].sets[si];
   set.done = !set.done;
   if(set.done){
@@ -1372,18 +1373,18 @@ function closeModal(){
 async function doSave(){
   closeModal();
   const now2 = new Date();
-  // 選択日付が今日なら正確な時刻（ローカル時刻）、過去日付なら12:00とする
-  function toLocalISO(d){
-    const pad = n=>String(n).padStart(2,'0');
-    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  // 選択日付が今日なら現在のタイムスタンプ、過去日付ならその日の12:00のタイムスタンプ
+  let sessionTimestamp;
+  if(selectedDate === today()){
+    sessionTimestamp = now2.getTime();
+  } else {
+    const [y,m,d] = selectedDate.split('-').map(Number);
+    sessionTimestamp = new Date(y, m-1, d, 12, 0, 0).getTime();
   }
-  const sessionDateTime = selectedDate === today()
-    ? toLocalISO(now2)
-    : selectedDate + 'T12:00:00';
   const session = {
     id: Date.now(),
     date: selectedDate,
-    datetime: sessionDateTime,
+    datetime: sessionTimestamp,
     gym: currentGym,
     exercises: exercises.map(e=>({
       name: e.name,
@@ -1417,11 +1418,19 @@ async function renderDash(){
   let hoursSince = '—';
   if(lastSession){
     // datetimeがあれば正確な時刻、なければ日付の12:00を使用
-    // datetimeがローカル時刻文字列の場合はそのままDate化（タイムゾーン付与しない）
-    const lastDt = lastSession.datetime
-      ? new Date(lastSession.datetime)
-      : new Date(lastSession.date + 'T12:00:00');
-    const diffMs = now - lastDt;
+    // datetimeはタイムスタンプ(number)。旧データ(文字列)やdatetime無しの場合はdateの12:00として扱う
+    let lastTs;
+    if(typeof lastSession.datetime === 'number'){
+      lastTs = lastSession.datetime;
+    } else if(typeof lastSession.datetime === 'string'){
+      // 旧形式の文字列datetimeはローカル日時として手動パース（ブラウザ依存を回避）
+      const m = lastSession.datetime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      lastTs = m ? new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]).getTime() : new Date(lastSession.date+'T12:00:00').getTime();
+    } else {
+      const [y,mo,d] = lastSession.date.split('-').map(Number);
+      lastTs = new Date(y, mo-1, d, 12, 0, 0).getTime();
+    }
+    const diffMs = now.getTime() - lastTs;
     daysSince = Math.floor(diffMs / (1000*60*60*24));
     hoursSince = Math.floor(diffMs / (1000*60*60));
   }
