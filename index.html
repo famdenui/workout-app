@@ -934,7 +934,7 @@ function renderGymChips(){
   const el = document.getElementById('gymChips');
   el.innerHTML = GYMS.map(g=>`
     <div class="gym-chip${g.id===currentGym?' on':''}" onclick="selectGym('${g.id}',this)" style="display:inline-flex;align-items:center;gap:6px;--gym-color:${g.color}">
-      <span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">${g.icon}</span>${g.label}
+      <span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">${g.icon||gymIconSvg(g.color)}</span>${g.label}
     </div>`).join('');
 }
 
@@ -1258,6 +1258,13 @@ function getAudioCtx(){
   return _audioCtx;
 }
 
+// 画面復帰時（ロック解除・アプリ切替）にAudioContextを再開
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && _audioCtx && _audioCtx.state === 'suspended'){
+    _audioCtx.resume();
+  }
+});
+
 // カウントダウン音：柔らかいベル（三角波）
 function beep(freq, duration, volume){
   try{
@@ -1291,24 +1298,32 @@ function playBuzzer(){
 
 // 終了音：フラットな矩形波ブザー「ビーーー」（440Hz・2秒）
 function playEndBuzzer(){
-  try{
-    const ctx = getAudioCtx();
-    if(!ctx) return;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.value = 440;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    const t0 = ctx.currentTime;
-    const duration = 2.0;
-    const volume = 0.2;
-    gain.gain.setValueAtTime(0, t0);
-    gain.gain.linearRampToValueAtTime(volume, t0+0.02);
-    gain.gain.setValueAtTime(volume, t0+duration-0.05);
-    gain.gain.linearRampToValueAtTime(0, t0+duration);
-    osc.start(t0); osc.stop(t0+duration);
-  }catch(e){ console.warn('end buzzer error:', e); }
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const doPlay = ()=>{
+    try{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 440;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const t0 = ctx.currentTime;
+      const duration = 2.0;
+      const volume = 0.2;
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(volume, t0+0.02);
+      gain.gain.setValueAtTime(volume, t0+duration-0.05);
+      gain.gain.linearRampToValueAtTime(0, t0+duration);
+      osc.start(t0); osc.stop(t0+duration);
+    }catch(e){ console.warn('end buzzer error:', e); }
+  };
+  // suspended状態ならresume完了を待ってから鳴らす
+  if(ctx.state === 'suspended'){
+    ctx.resume().then(doPlay).catch(()=>doPlay());
+  } else {
+    doPlay();
+  }
 }
 
 // ユーザー操作時にAudioContextを初期化（iOSの制限対策）
@@ -1942,7 +1957,9 @@ function loadGyms(){
 }
 
 function saveGyms(){
-  localStorage.setItem('wt_gyms', JSON.stringify(GYMS));
+  // iconは色から再生成できるので保存しない（容量節約＆色変更時の不整合防止）
+  const toSave = GYMS.map(({id,label,color})=>({id,label,color}));
+  localStorage.setItem('wt_gyms', JSON.stringify(toSave));
 }
 
 function gymIconSvg(color){
@@ -1983,7 +2000,7 @@ function addGym(){
   if(!name){ showToast('拠点名を入力してください'); return; }
   if(GYMS.find(g=>g.label===name)){ showToast('すでに存在します'); return; }
   const id = 'gym_' + Date.now();
-  GYMS.push({id, label:name, color:selectedNewColor});
+  GYMS.push({id, label:name, color:selectedNewColor, icon: gymIconSvg(selectedNewColor)});
   saveGyms();
   input.value = '';
   renderGymSettings();
