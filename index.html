@@ -1531,8 +1531,13 @@ async function renderDash(){
   const total = recent.length;
   let totalVol = 0;
   recent.forEach(s=>s.exercises.forEach(e=>e.sets.forEach(st=>{ totalVol += st.weight*st.reps; })));
-  const daysInMonth = now.getDate();
-  const pace = total > 0 ? (daysInMonth / total).toFixed(1) : '—';
+  // データ期間の実日数を計算（期間内最古のセッション日〜今日）
+  let periodDays = 1;
+  if(recent.length > 0){
+    const oldest = recent.reduce((min,s)=>new Date(s.date)<new Date(min.date)?s:min, recent[0]);
+    periodDays = Math.max(1, Math.ceil((now - new Date(oldest.date+'T00:00:00')) / (1000*60*60*24)));
+  }
+  const pace = total > 0 ? (periodDays / total).toFixed(1) : '—';
   const lastSession = all.length > 0 ? all[all.length-1] : null;
   let daysSince = '—';
   let hoursSince = '—';
