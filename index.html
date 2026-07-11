@@ -782,7 +782,23 @@ const CATEGORY_ICONS = {
 };
 
 function getExerciseMaster(gymId){
-  return EXERCISE_MASTER_BASE[gymId] || [];
+  // 実際の記録履歴から使用頻度順に生成（直近ほど重み大）
+  // 履歴にない種目はプリセットで補完
+  const sessions = getDB().filter(s=>s.gym===gymId);
+  const score = {};
+  sessions.forEach((s, idx)=>{
+    // 新しいセッションほど重みを増やす（recency bias）
+    const w = 1 + idx / Math.max(1, sessions.length);
+    s.exercises.forEach(e=>{
+      score[e.name] = (score[e.name]||0) + w;
+    });
+  });
+  const fromHistory = Object.entries(score)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([name])=>name);
+  const preset = EXERCISE_MASTER_BASE[gymId] || [];
+  const rest = preset.filter(n=>!fromHistory.includes(n));
+  return [...fromHistory, ...rest];
 }
 // カスタム種目のアイコンキャッシュ
 const customExerciseCategories = {};
@@ -1254,7 +1270,20 @@ function startTimer(ei, si){
 // Web Audio APIでビープ音を生成
 // AudioContextをシングルトンで管理（iOSはユーザー操作後に初期化）
 let _audioCtx = null;
+
+// 他アプリの音楽（Spotify等）を止めずにタイマー音をミックス再生する設定
+// iOS 17+ の Audio Session API。'ambient' = 他の音と共存
+function setAmbientAudioSession(){
+  try{
+    if(navigator.audioSession && navigator.audioSession.type !== 'ambient'){
+      navigator.audioSession.type = 'ambient';
+    }
+  }catch(e){}
+}
+setAmbientAudioSession();
+
 function getAudioCtx(){
+  setAmbientAudioSession();
   if(!_audioCtx){
     try{
       _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -1266,12 +1295,30 @@ function getAudioCtx(){
   return _audioCtx;
 }
 
-// 画面復帰時（ロック解除・アプリ切替）にAudioContextを再開
-document.addEventListener('visibilitychange', ()=>{
-  if(!document.hidden && _audioCtx && _audioCtx.state === 'suspended'){
-    _audioCtx.resume();
+// 画面復帰時（ロック解除・他アプリからの復帰）に音声を復旧
+// 他アプリ（Spotify等）が音声を奪うとキープアライブのオシレーターが内部的に停止するため、
+// 復帰時はコンテキストのresumeに加えてキープアライブを作り直す
+function reviveAudio(){
+  if(!_audioCtx) return;
+  const restart = ()=>{
+    if(timerRunning){
+      stopAudioKeepAlive();
+      startAudioKeepAlive();
+    }
+  };
+  if(_audioCtx.state !== 'running'){
+    _audioCtx.resume().then(restart).catch(restart);
+  } else {
+    restart();
   }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden) reviveAudio();
 });
+// 復帰後の最初のタップでも再アーム（iOSはユーザー操作起点だと確実に復旧できる）
+document.addEventListener('touchstart', ()=>{
+  if(timerRunning && _audioCtx && _audioCtx.state !== 'running') reviveAudio();
+}, {passive:true});
 
 // --- オーディオキープアライブ ---
 // iOSはユーザー操作から時間が経つとJS起点の音を無音化することがあるため、
@@ -1756,13 +1803,15 @@ async function generateAIAdvice(filtered, stagnant, all, bodyParts){
   const stagnantNames = stagnant.map(e=>e.name).join('、')||'なし';
   const balanceSummary = bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+':'+b.sets+'set'+(b.sets<b.target*0.5?'(不足)':'(OK)')).join(', ') : '';
 
-  const gymExMap = {};
-  all.forEach(s=>{
-    const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
-    if(!gymExMap[gym]) gymExMap[gym]=new Set();
-    s.exercises.forEach(e=>gymExMap[gym].add(e.name));
-  });
-  const gymExSummary = Object.entries(gymExMap).map(([g,set])=>g+'でよく使う種目: '+[...set].slice(0,6).join('、')).join('\n');
+  // 拠点ごとに使用頻度順で上位8種目を抽出
+  const gymExSummary = GYMS.map(g=>{
+    const freq = {};
+    all.filter(s=>s.gym===g.id).forEach(s=>{
+      s.exercises.forEach(e=>{ freq[e.name]=(freq[e.name]||0)+1; });
+    });
+    const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([n,c])=>n+'('+c+'回)');
+    return top.length ? g.label+'でよく使う種目: '+top.join('、') : null;
+  }).filter(Boolean).join('\n');
 
   const prompt = `あなたは優秀なパーソナルトレーナーです。以下のトレーニング履歴を分析して、次回のトレーニングに向けた具体的なメニュー提案とアドバイスをJSONのみで返してください。
 
