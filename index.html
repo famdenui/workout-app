@@ -157,6 +157,8 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;height:100
 .ex-meta{flex:1;min-width:0}
 .ex-name{font-size:13px;font-weight:500;color:var(--text)}
 .ex-prev{font-size:10px;color:var(--text4);font-family:var(--mono);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bw-toggle{font-size:10px;font-weight:600;padding:4px 9px;border-radius:99px;border:0.5px solid var(--border2);background:var(--bg);color:var(--text4);cursor:pointer;font-family:var(--font);margin-right:4px;flex-shrink:0;touch-action:manipulation}
+.bw-toggle.on{background:#00c7be;border-color:#00c7be;color:#fff}
 .ex-del{width:28px;height:28px;border:none;background:none;color:var(--text5);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0}
 .ex-del:hover{background:var(--bg);color:var(--text3)}
 
@@ -389,8 +391,8 @@ document.head.appendChild(link);
       </div>
     </div>
     <div class="adj-row">
-      <div class="adj-btn" onclick="adjustDur(-15)">−15秒</div>
-      <div class="adj-btn" onclick="adjustDur(15)">+15秒</div>
+      <div class="adj-btn" onclick="adjustDur(-10)">−10秒</div>
+      <div class="adj-btn" onclick="adjustDur(10)">+10秒</div>
       <div class="adj-btn reset" onclick="resetTimer()">↺ リセット</div>
     </div>
   </div>
@@ -403,6 +405,22 @@ document.head.appendChild(link);
   <div class="screen" id="screen-settings">
     <div class="page-title">設定</div>
     <div class="page-sub">拠点の管理</div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">インターバルタイマー</div>
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:13px;color:var(--text)">インターバル時間</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="num-ctrl-btn" onclick="settingsAdjustDur(-10)" style="width:32px;height:32px;font-size:18px">−</button>
+            <div id="settingsDurLbl" style="font-size:16px;font-weight:600;color:var(--text);font-family:var(--mono);min-width:56px;text-align:center">90秒</div>
+            <button class="num-ctrl-btn" onclick="settingsAdjustDur(10)" style="width:32px;height:32px;font-size:18px">＋</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text4);margin-bottom:10px">プリセット（タップで設定）</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="durPresets"></div>
+      </div>
+    </div>
 
     <div class="settings-section">
       <div class="settings-section-title">拠点</div>
@@ -590,7 +608,7 @@ let currentGym = 'toritsu';
 let exercises = [];
 let timerInterval = null;
 let timerSec = 0;
-let timerDur = 90;
+let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'90', 10);
 let timerRunning = false;
 let timerExIdx = -1;
 let timerSetIdx = -1;
@@ -718,7 +736,13 @@ async function migrateToSupabase(){
 
 function pad(n){ return String(n).padStart(2,'0'); }
 function fmtSec(s){ return Math.floor(s/60)+':'+pad(s%60); }
-function today(){ return new Date().toISOString().slice(0,10); }
+function today(){
+  // toISOString()はUTC基準のため日本時間の朝9時まで前日になるバグがあった
+  // ローカル日付で生成する
+  const d = new Date();
+  const pad = n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
 function fmtDate(d){ const dt=new Date(d); return dt.getFullYear()+'年'+(dt.getMonth()+1)+'月'+dt.getDate()+'日'; }
 function dayLabel(d){ const days=['日','月','火','水','木','金','土']; return days[new Date(d).getDay()]+'曜日'; }
 
@@ -1048,6 +1072,17 @@ function addCustomExercise(){
   if(val) addExerciseByName(val);
 }
 
+// 過去の記録から自重フラグを取得（最新の記録を優先）
+function getPrevBodyweightFlag(name){
+  const sessions = getDB();
+  for(let i=sessions.length-1;i>=0;i--){
+    for(const ex of sessions[i].exercises){
+      if(ex.name === name && typeof ex.bodyweight === 'boolean') return ex.bodyweight;
+    }
+  }
+  return null;
+}
+
 function getPrevData(){
   const all = getDB();
   const sessions = all.filter(s=>s.gym===currentGym);
@@ -1081,7 +1116,13 @@ async function addExerciseByName(name){
   } else {
     sets = [{weight:20,reps:10,done:false,preset:false},{weight:20,reps:10,done:false,preset:false},{weight:20,reps:10,done:false,preset:false}];
   }
-  exercises.unshift({name, sets});
+  // 自重種目の自動判定（過去の記録があればそのフラグ、なければ名前パターンで判定）
+  const prevBw = getPrevBodyweightFlag(name);
+  const bodyweight = prevBw !== null ? prevBw : isLikelyBodyweight(name);
+  if(bodyweight && (!prev || !prev.length)){
+    sets.forEach(s=>{ s.weight = 0; });
+  }
+  exercises.unshift({name, sets, bodyweight});
   hideSuggest();
   renderRec();
   setTimeout(()=>{
@@ -1105,6 +1146,22 @@ async function addExerciseByName(name){
 function removeExercise(idx){
   exercises.splice(idx,1);
   renderRec();
+}
+
+// 自重トグル切り替え
+function toggleBodyweight(ei){
+  exercises[ei].bodyweight = !exercises[ei].bodyweight;
+  // 自重に切り替えた時は重量入力を0に（加重分のみ入力する運用）
+  if(exercises[ei].bodyweight){
+    exercises[ei].sets.forEach(s=>{ if(!s.done) s.weight = 0; });
+  }
+  renderRec();
+}
+
+// 自重種目の名前パターン（新規追加時の自動判定用）
+const BODYWEIGHT_PATTERNS = ['懸垂','チンニング','プルアップ','ディップス','バックエクステンション','プッシュアップ','腕立て','プランク','レッグレイズ','クランチ','シットアップ','ハイパーエクステンション'];
+function isLikelyBodyweight(name){
+  return BODYWEIGHT_PATTERNS.some(p=>name.includes(p));
 }
 
 
@@ -1205,13 +1262,25 @@ function renderRec(){
 
   list.innerHTML = exercises.map((ex,ei)=>{
     const prev = getPrevSets(ex.name);
-    const prevStr = prev ? prev.map(s=>s.weight+'kg×'+s.reps).join(' · ') : '前回記録なし';
+    const prevStr = prev ? prev.map(s=>{
+      if(ex.bodyweight) return (s.weight>0?'自重+'+s.weight+'kg':'自重')+'×'+s.reps;
+      return s.weight+'kg×'+s.reps;
+    }).join(' · ') : '前回記録なし';
     const allDone = ex.sets.every(s=>s.done);
     const anyDone = ex.sets.some(s=>s.done);
 
     const setsHtml = ex.sets.map((s,si)=>`
       <div class="set-row">
         <div class="set-num">${si+1}</div>
+        ${ex.bodyweight ? `
+        <div class="num-ctrl" style="background:rgba(0,199,190,0.12);border:0.5px solid rgba(0,199,190,0.3)">
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
+          <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
+            onchange="setVal(${ei},${si},'weight',this.value)"
+            onfocus="this.select()" style="width:42px">
+          <span style="font-size:10px;color:#00c7be;font-weight:600">+kg</span>
+          <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
+        </div>` : `
         <div class="num-ctrl">
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
           <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
@@ -1219,7 +1288,7 @@ function renderRec(){
             onfocus="this.select()" style="width:42px">
           <span style="font-size:10px;color:var(--text5)">kg</span>
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
-        </div>
+        </div>`}
         <div class="num-ctrl">
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
           <input class="num-direct" type="number" inputmode="numeric" value="${s.reps}"
@@ -1243,6 +1312,7 @@ function renderRec(){
             <div class="ex-name">${ex.name}</div>
             <div class="ex-prev">${prevStr}</div>
           </div>
+          <button class="bw-toggle${ex.bodyweight?' on':''}" onclick="toggleBodyweight(${ei})">自重</button>
           <button class="ex-del" onclick="removeExercise(${ei})"><span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></i></button>
         </div>
         ${setsHtml}
@@ -1444,7 +1514,9 @@ function updateTimerUI(){
 
   if(nextSet){
     document.getElementById('timerNextEx').textContent = ex.name;
-    document.getElementById('timerNextSet').textContent = nextSet.weight+'kg × '+nextSet.reps+'回';
+    const timerEx = exercises[timerExIdx];
+    const wLabel = (timerEx && timerEx.bodyweight) ? (nextSet.weight>0?'自重+'+nextSet.weight+'kg':'自重') : nextSet.weight+'kg';
+    document.getElementById('timerNextSet').textContent = wLabel+' × '+nextSet.reps+'回';
   } else {
     document.getElementById('timerNextEx').textContent = '次の種目へ';
     document.getElementById('timerNextSet').textContent = '—';
@@ -1467,7 +1539,8 @@ function updateTimerUI(){
 }
 
 function adjustDur(delta){
-  timerDur = Math.max(15, Math.min(300, timerDur+delta));
+  timerDur = Math.max(10, Math.min(300, timerDur+delta));
+  localStorage.setItem('wt_timer_dur', String(timerDur));
   if(timerRunning) timerSec = Math.min(timerSec, timerDur);
   updateTimerUI();
 }
@@ -1549,6 +1622,7 @@ async function doSave(){
     gym: currentGym,
     exercises: exercises.slice().reverse().map(e=>({
       name: e.name,
+      bodyweight: !!e.bodyweight,
       sets: e.sets.map(s=>({weight:s.weight, reps:s.reps}))
     }))
   };
@@ -1672,6 +1746,7 @@ async function renderDash(){
   const recentSorted = [...recent].sort((a,b)=>new Date(a.date)-new Date(b.date));
   for(const s of recentSorted){
     for(const ex of s.exercises){
+      if(ex.bodyweight) continue; // 自重種目は重量ボリューム集計から除外
       const key = ex.name+'|'+s.gym;
       if(!exMap[key]) exMap[key]={name:ex.name, gym:s.gym, sessions:[]};
       const vol = ex.sets.reduce((a,st)=>a+st.weight*st.reps,0);
@@ -1775,6 +1850,10 @@ async function generateAIAdvice(filtered, stagnant, all, bodyParts){
   const sessionDetail = recentSessions.map(s=>{
     const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
     const exList2 = s.exercises.map(e=>{
+      if(e.bodyweight){
+        const setStr = e.sets.map(st=>(st.weight>0?'自重+'+st.weight+'kg':'自重')+'×'+st.reps+'rep').join(' / ');
+        return e.name+'(自重種目)['+setStr+']';
+      }
       const setStr = e.sets.map(st=>st.weight+'kg×'+st.reps+'rep').join(' / ');
       const totalVol = e.sets.reduce((a,st)=>a+st.weight*st.reps,0);
       return e.name+'['+setStr+'] 総量:'+totalVol+'kg';
@@ -1788,14 +1867,18 @@ async function generateAIAdvice(filtered, stagnant, all, bodyParts){
       if(!repTrends[e.name]) repTrends[e.name]=[];
       const avgRep = e.sets.reduce((a,st)=>a+st.reps,0)/e.sets.length;
       const maxW = Math.max(...e.sets.map(st=>st.weight));
-      repTrends[e.name].push({date:s.date, maxW, avgRep: avgRep.toFixed(1)});
+      repTrends[e.name].push({date:s.date, maxW, avgRep: avgRep.toFixed(1), bw: !!e.bodyweight});
     });
   });
   const repTrendSummary = Object.entries(repTrends).map(([name,arr])=>{
     if(arr.length<2) return null;
     const first = arr[0], last = arr[arr.length-1];
-    const wDiff = last.maxW - first.maxW;
     const rDiff = parseFloat(last.avgRep) - parseFloat(first.avgRep);
+    if(last.bw){
+      // 自重種目はレップ数の推移のみ
+      return name+'(自重): レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
+    }
+    const wDiff = last.maxW - first.maxW;
     return name+': 重量'+(wDiff>0?'+':'')+wDiff+'kg, レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
   }).filter(Boolean).join('\n');
 
@@ -1818,6 +1901,7 @@ async function generateAIAdvice(filtered, stagnant, all, bodyParts){
 【重要】次回メニューは拠点に依存しない普遍的な提案にしてください。特定の拠点でしかできない種目より、どの拠点でも実施できる種目を優先してください。同じ種目でも拠点（マシンの機種）が違うと重量の感覚が異なるため、推奨重量は直近の履歴を基準にしつつ「前回の重量+2.5kg」のような相対表現も活用してください。
 種目数は最大5つまでとし、本当に優先度が高いものだけに厳選してください（1回のトレーニングで現実的にこなせる量にする）。
 advicesの最低1つは最新のトレーニング内容（種目の選択・順序・重量・レップ）への具体的なフィードバックにしてください。種目の順序について言及する場合は、履歴に記載された順序＝実際に実施した順序として扱ってください。
+自重種目（懸垂・バックエクステンション等）は「(自重種目)」と表記されており、重量ではなくレップ数・セット数で評価してください。自重種目の重量提案は「自重」または「自重+5kg（加重）」のような形式にしてください。
 weightフィールドは必ず具体的な数値を含め、12文字以内の短い表記にしてください（例:「23kg」「25.5kg」「+2.5kg」）。空欄や「適宜調整」のような曖昧な表現、長い説明文は禁止です。履歴に直近の重量があればそれを基準に算出し、初めての種目なら部位・体格を考慮した妥当な開始重量を提案してください。
 
 【ユーザープロフィール】
@@ -2015,8 +2099,11 @@ async function renderHist(){
     const tags = s.exercises.slice(0,3).map(e=>`<span class="hist-tag">${e.name}</span>`).join('');
     const more = s.exercises.length>3 ? `<span class="hist-more">+${s.exercises.length-3}</span>` : '';
     const detail = s.exercises.map(e=>{
-      const sets = e.sets.map(st=>`<span class="hist-dset">${st.weight}×${st.reps}</span>`).join('');
-      return `<div class="hist-dr"><div class="hist-dn">${e.name}</div><div class="hist-ds">${sets}</div></div>`;
+      const sets = e.sets.map(st=>{
+        const w = e.bodyweight ? (st.weight>0?'自重+'+st.weight:'自重') : st.weight;
+        return `<span class="hist-dset">${w}×${st.reps}</span>`;
+      }).join('');
+      return `<div class="hist-dr"><div class="hist-dn">${e.name}${e.bodyweight?'<span style="font-size:9px;color:#00c7be;margin-left:4px">自重</span>':''}</div><div class="hist-ds">${sets}</div></div>`;
     }).join('');
     return `
       <div class="hist-item" onclick="toggleDetail(this)">
@@ -2087,6 +2174,33 @@ function showChartTooltip(e, name, date, vol){
 document.addEventListener('click', ()=>{
   document.getElementById('chartTooltip').style.display='none';
 });
+
+// --- SETTINGS / TIMER ---
+const DUR_PRESETS = [30, 60, 90, 120, 150, 180];
+
+function renderDurSettings(){
+  const lbl = document.getElementById('settingsDurLbl');
+  if(lbl) lbl.textContent = timerDur+'秒';
+  const wrap = document.getElementById('durPresets');
+  if(wrap){
+    wrap.innerHTML = DUR_PRESETS.map(sec=>
+      '<button onclick="setDurPreset('+sec+')" style="padding:7px 14px;border-radius:99px;border:0.5px solid '+(timerDur===sec?'var(--accent)':'var(--border2)')+';background:'+(timerDur===sec?'var(--accent)':'var(--bg)')+';color:'+(timerDur===sec?'#fff':'var(--text3)')+';font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);touch-action:manipulation">'+sec+'秒</button>'
+    ).join('');
+  }
+}
+
+function settingsAdjustDur(delta){
+  timerDur = Math.max(10, Math.min(300, timerDur+delta));
+  localStorage.setItem('wt_timer_dur', String(timerDur));
+  renderDurSettings();
+}
+
+function setDurPreset(sec){
+  timerDur = sec;
+  localStorage.setItem('wt_timer_dur', String(timerDur));
+  renderDurSettings();
+  showToast('インターバルを'+sec+'秒に設定しました');
+}
 
 // --- SETTINGS / GYM MANAGEMENT ---
 const GYM_COLORS = ['#5e5ce6','#007aff','#34c759','#ff9500','#ff3b30','#af52de','#ff2d55','#00c7be'];
@@ -2306,7 +2420,7 @@ function showScreen(id, btn){
   btn.classList.add('on');
   if(id==='dash'){ syncFromSupabase().then(r=>{ if(r&&r.changed) renderDash(); }); renderDash(); }
   if(id==='hist'){ syncFromSupabase().then(r=>{ if(r&&r.changed) renderHist(); }); renderHist(); }
-  if(id==='settings') renderGymSettings();
+  if(id==='settings'){ renderGymSettings(); renderDurSettings(); }
 }
 
 // --- TOAST ---
