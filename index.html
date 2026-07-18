@@ -362,8 +362,8 @@ document.head.appendChild(link);
             <stop offset="100%" stop-color="#5e5ce6"/>
           </linearGradient>
         </defs>
-        <circle cx="100" cy="100" r="88" fill="none" stroke="#e5e5ea" stroke-width="7"/>
-        <circle id="ringProgress" cx="100" cy="100" r="88" fill="none" stroke="url(#ringGrad)" stroke-width="7"
+        <circle cx="100" cy="100" r="88" fill="none" stroke="#e5e5ea" stroke-width="11"/>
+        <circle id="ringProgress" cx="100" cy="100" r="88" fill="none" stroke="url(#ringGrad)" stroke-width="11"
           stroke-dasharray="552.9" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 100 100)"
           style="transition:stroke-dashoffset 1s linear"/>
         <circle cx="100" cy="12" r="3.5" fill="#d1d1d6"/>
@@ -608,7 +608,8 @@ let currentGym = 'toritsu';
 let exercises = [];
 let timerInterval = null;
 let timerSec = 0;
-let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'90', 10);
+let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'90', 10); // 設定値（恒久）
+let sessionDur = timerDur; // 現在のタイマー1回分の実効値（±ボタンでの一時調整を含む）
 let timerRunning = false;
 let timerExIdx = -1;
 let timerSetIdx = -1;
@@ -892,7 +893,10 @@ function judgeProgression(name, sessionsAsc){
 
   // 直近2回連続で全セット目標rep達成 → 増量推奨
   if(last.allHit && prev.allHit && last.maxW === prev.maxW){
-    return {status:'increase', label:'増量推奨', detail:'+'+getIncrement(name)+'kg で次へ'};
+    // 全セッションで重量0＝純粋な自重種目は加重かレップ目標引き上げを提案
+    const allZero = recs.every(r=>r.maxW===0);
+    const detail = allZero ? '加重かレップ目標増を検討' : '+'+getIncrement(name)+'kg で次へ';
+    return {status:'increase', label:'増量推奨', detail};
   }
 
   // 目標rep達成済みかつ同一重量が3回以上継続 → 停滞
@@ -1267,9 +1271,10 @@ function syncWeightForward(ei, si, v){
 
 function setVal(ei, si, field, raw){
   const step = field==='weight' ? 0.5 : 1;
+  const minW = exercises[ei].bodyweight ? 0 : 0.5;
   let v = parseFloat(raw);
-  if(isNaN(v) || v <= 0) v = step;
-  if(field==='weight') v = Math.max(0.5, Math.round(v*2)/2);
+  if(isNaN(v)) v = field==='weight' ? minW : step;
+  if(field==='weight') v = Math.max(minW, Math.round(v*2)/2);
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
@@ -1282,7 +1287,9 @@ function setVal(ei, si, field, raw){
 function changeVal(ei, si, field, delta){
   const step = field==='weight' ? 0.5 : 1;
   let v = exercises[ei].sets[si][field] + delta*step;
-  if(field==='weight') v = Math.max(0.5, Math.round(v*2)/2);
+  // 自重種目は加重0（＝純粋な自重）を許可する
+  const minW = exercises[ei].bodyweight ? 0 : 0.5;
+  if(field==='weight') v = Math.max(minW, Math.round(v*2)/2);
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
   exercises[ei].sets[si].preset = false;
@@ -1423,7 +1430,8 @@ function startTimer(ei, si){
   if(timerRunning) clearInterval(timerInterval);
   timerExIdx = ei;
   timerSetIdx = si;
-  timerSec = timerDur;
+  sessionDur = timerDur; // 設定値から開始（前回の一時調整はリセット）
+  timerSec = sessionDur;
   timerRunning = true;
   document.getElementById('timerScreen').classList.add('on');
   updateTimerUI();
@@ -1616,7 +1624,7 @@ function updateTimerUI(){
     document.getElementById('timerNextSet').textContent = '—';
   }
 
-  const prog = 552.9 * (1 - timerSec/timerDur);
+  const prog = 552.9 * (1 - timerSec/sessionDur);
   document.getElementById('ringProgress').style.strokeDashoffset = prog;
 
   const segsEl = document.getElementById('timerSegs');
@@ -1629,18 +1637,18 @@ function updateTimerUI(){
   }).join('');
 
   document.getElementById('segLbl').textContent = 'セット '+(timerSetIdx+1)+'/'+allSets.length;
-  document.getElementById('durLbl').textContent = timerDur+'秒';
+  document.getElementById('durLbl').textContent = sessionDur+'秒';
 }
 
 function adjustDur(delta){
-  timerDur = Math.max(10, Math.min(300, timerDur+delta));
-  localStorage.setItem('wt_timer_dur', String(timerDur));
-  if(timerRunning) timerSec = Math.min(timerSec, timerDur);
+  // この回だけの一時調整。設定のデフォルト値（timerDur）は変更しない
+  sessionDur = Math.max(10, Math.min(300, sessionDur+delta));
+  if(timerRunning) timerSec = Math.max(1, Math.min(timerSec+delta, sessionDur));
   updateTimerUI();
 }
 
 function resetTimer(){
-  timerSec = timerDur;
+  timerSec = sessionDur;
   if(!timerRunning){
     timerRunning = true;
     timerInterval = setInterval(tickTimer, 1000);
