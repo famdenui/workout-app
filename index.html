@@ -471,7 +471,14 @@ document.head.appendChild(link);
         <div class="ai-lbl">AIコーチに相談</div>
         <div class="ai-updated" id="aiUpdated"></div>
       </div>
-      <div id="aiContent"></div>
+      <div id="aiContent">
+        <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:10px">トレーニングデータをまとめてClaudeに送り、詳しいフィードバックと次回メニューの相談ができます</div>
+        <button onclick="copyDetailPrompt()" style="width:100%;padding:12px;background:var(--accent);border:none;border-radius:10px;font-size:13px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:7px;touch-action:manipulation">
+          <span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          Claudeに詳しく相談する
+        </button>
+        <div style="font-size:10px;color:var(--text4);text-align:center;margin-top:6px">タップでコピー → Claudeが開きます</div>
+      </div>
     </div>
     <div class="filter-row" id="filterRow" style="display:none"></div>
     <div class="sec-div" style="display:none"><div class="sec-line"></div><div class="sec-lbl">種目別 総重量</div><div class="sec-line"></div></div>
@@ -1870,7 +1877,6 @@ async function renderDash(){
   const epcEl = document.getElementById('epcList');
   if(!filtered.length){
     epcEl.innerHTML = '<div class="empty"><p style="font-size:32px;margin-bottom:12px">📊</p><p>まだデータがありません。<br>トレーニングを記録すると<br>ここに表示されます。</p></div>';
-    document.getElementById('aiContent').innerHTML = '<div style="font-size:12px;color:var(--text4)">トレーニングを記録するとClaudeに相談できます</div>';
     return;
   }
 
@@ -1938,7 +1944,6 @@ async function renderDash(){
     '</div>';
   }).join('');
 
-  generateAIAdvice(exList, stagnant, all, bodyParts, increaseReady);
 }
 
 function setFilter(id){
@@ -1946,75 +1951,6 @@ function setFilter(id){
   renderDash();
 }
 
-function generateAIAdvice(exListAll, stagnant, all, bodyParts, increaseReady){
-  const aiContent = document.getElementById('aiContent');
-  const aiUpdated = document.getElementById('aiUpdated');
-  if(aiUpdated) aiUpdated.textContent = '';
-
-  if(!all.length){
-    aiContent.innerHTML = '<div style="font-size:12px;color:var(--text4)">トレーニングを記録するとClaudeに相談できます</div>';
-    return;
-  }
-
-  // 詳細相談プロンプト用のデータを構築（API呼び出しは行わない）
-  const recentSessions = all.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,10);
-  const sessionDetail = recentSessions.map(s=>{
-    const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
-    const exList2 = s.exercises.map(e=>{
-      if(e.bodyweight){
-        const setStr = e.sets.map(st=>(st.weight>0?'自重+'+st.weight+'kg':'自重')+'×'+st.reps+'rep').join(' / ');
-        return e.name+'(自重種目)['+setStr+']';
-      }
-      const setStr = e.sets.map(st=>st.weight+'kg×'+st.reps+'rep').join(' / ');
-      const totalVol = e.sets.reduce((a,st)=>a+st.weight*st.reps,0);
-      return e.name+'['+setStr+'] 総量:'+totalVol+'kg';
-    }).join(', ');
-    return s.date+' ['+gym+']: '+exList2;
-  }).join('\n');
-
-  const repTrends = {};
-  recentSessions.slice().reverse().forEach(s=>{
-    s.exercises.forEach(e=>{
-      const tKey = getCompareKey(e.name, s.gym);
-      if(!repTrends[tKey]) repTrends[tKey]=[];
-      const avgRep = e.sets.reduce((a,st)=>a+st.reps,0)/e.sets.length;
-      const maxW = Math.max(...e.sets.map(st=>st.weight));
-      repTrends[tKey].push({name:e.name, gym:s.gym, date:s.date, maxW, avgRep: avgRep.toFixed(1), bw: !!e.bodyweight});
-    });
-  });
-  const repTrendSummary = Object.entries(repTrends).map(([tKey,arr])=>{
-    if(arr.length<2) return null;
-    const first = arr[0], last = arr[arr.length-1];
-    const rDiff = parseFloat(last.avgRep) - parseFloat(first.avgRep);
-    const isMachine = tKey.indexOf('|all') === -1;
-    const scopeLabel = isMachine ? '@'+(GYMS.find(g=>g.id===last.gym)?.label||last.gym) : '(全拠点)';
-    if(last.bw){
-      return last.name+scopeLabel+'(自重): レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
-    }
-    const wDiff = last.maxW - first.maxW;
-    return last.name+scopeLabel+': 重量'+(wDiff>0?'+':'')+wDiff+'kg, レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
-  }).filter(Boolean).join('\n');
-
-  const gymExSummary = GYMS.map(g=>{
-    const freq = {};
-    all.filter(s=>s.gym===g.id).forEach(s=>{
-      s.exercises.forEach(e=>{ freq[e.name]=(freq[e.name]||0)+1; });
-    });
-    const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([n,c])=>n+'('+c+'回)');
-    return top.length ? g.label+'でよく使う種目: '+top.join('、') : null;
-  }).filter(Boolean).join('\n');
-
-  const detailPrompt = buildDetailPrompt(all, exListAll, stagnant, bodyParts, repTrendSummary, sessionDetail, gymExSummary);
-  window._detailPrompt = detailPrompt;
-
-  aiContent.innerHTML =
-    '<div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:10px">トレーニングデータをまとめてClaudeに送り、詳しいフィードバックと次回メニューの相談ができます</div>'+
-    '<button onclick="copyDetailPrompt()" style="width:100%;padding:12px;background:var(--accent);border:none;border-radius:10px;font-size:13px;font-weight:600;color:#fff;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:7px;touch-action:manipulation">'+
-      '<span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>'+
-      'Claudeに詳しく相談する'+
-    '</button>'+
-    '<div style="font-size:10px;color:var(--text4);text-align:center;margin-top:6px">タップでコピー → Claudeが開きます</div>';
-}
 
 // 詳細相談用の長文プロンプトを生成
 function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, sessionDetail, gymExSummary){
@@ -2055,11 +1991,108 @@ ${stagnantNames}
 }
 
 function copyDetailPrompt(){
-  if(!window._detailPrompt) return;
-  navigator.clipboard.writeText(window._detailPrompt).then(()=>{
+  let prompt;
+  try{
+    prompt = buildPromptFromDB();
+  }catch(e){
+    console.error('prompt build error:', e);
+    showToast('データの集計に失敗しました');
+    return;
+  }
+  if(!prompt){ showToast('まだ記録がありません'); return; }
+  navigator.clipboard.writeText(prompt).then(()=>{
     showToast('コピーしました。Claudeを開きます');
     setTimeout(()=>{ window.open('https://claude.ai/new', '_blank', 'noopener,noreferrer'); }, 600);
   }).catch(()=>{ showToast('コピーに失敗しました'); });
+}
+
+// タップ時にDBから直接プロンプトを組み立てる（画面描画に依存しない）
+function buildPromptFromDB(){
+  const db = getDB();
+  if(!db.length) return null;
+  const now = new Date();
+  const cutoff = new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
+  const all = db.filter(s=>new Date(s.date+'T00:00:00') >= cutoff);
+  if(!all.length) return null;
+
+  // 直近10セッション詳細
+  const recentSessions = all.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,10);
+  const sessionDetail = recentSessions.map(s=>{
+    const gym = GYMS.find(g=>g.id===s.gym)?.label||s.gym;
+    const exList2 = (s.exercises||[]).map(e=>{
+      const sets = e.sets||[];
+      if(e.bodyweight){
+        const setStr = sets.map(st=>(st.weight>0?'自重+'+st.weight+'kg':'自重')+'×'+st.reps+'rep').join(' / ');
+        return e.name+'(自重種目)['+setStr+']';
+      }
+      const setStr = sets.map(st=>st.weight+'kg×'+st.reps+'rep').join(' / ');
+      const totalVol = sets.reduce((a,st)=>a+st.weight*st.reps,0);
+      return e.name+'['+setStr+'] 総量:'+totalVol+'kg';
+    }).join(', ');
+    return s.date+' ['+gym+']: '+exList2;
+  }).join('\n');
+
+  // 種目別推移（比較スコープ準拠）
+  const repTrends = {};
+  recentSessions.slice().reverse().forEach(s=>{
+    (s.exercises||[]).forEach(e=>{
+      const sets = e.sets||[];
+      if(!sets.length) return;
+      const tKey = getCompareKey(e.name, s.gym);
+      if(!repTrends[tKey]) repTrends[tKey]=[];
+      const avgRep = sets.reduce((a,st)=>a+st.reps,0)/sets.length;
+      const maxW = Math.max(...sets.map(st=>st.weight));
+      repTrends[tKey].push({name:e.name, gym:s.gym, maxW, avgRep: avgRep.toFixed(1), bw: !!e.bodyweight});
+    });
+  });
+  const repTrendSummary = Object.entries(repTrends).map(([tKey,arr])=>{
+    if(arr.length<2) return null;
+    const first = arr[0], last = arr[arr.length-1];
+    const rDiff = parseFloat(last.avgRep) - parseFloat(first.avgRep);
+    const isMachine = tKey.indexOf('|all') === -1;
+    const scopeLabel = isMachine ? '@'+(GYMS.find(g=>g.id===last.gym)?.label||last.gym) : '(全拠点)';
+    if(last.bw){
+      return last.name+scopeLabel+'(自重): レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
+    }
+    const wDiff = last.maxW - first.maxW;
+    return last.name+scopeLabel+': 重量'+(wDiff>0?'+':'')+wDiff+'kg, レップ'+(rDiff>0?'+':'')+rDiff.toFixed(1)+'rep（直近'+arr.length+'回）';
+  }).filter(Boolean).join('\n');
+
+  // 拠点別頻出種目
+  const gymExSummary = GYMS.map(g=>{
+    const freq = {};
+    all.filter(s=>s.gym===g.id).forEach(s=>{
+      (s.exercises||[]).forEach(e=>{ freq[e.name]=(freq[e.name]||0)+1; });
+    });
+    const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([n,c])=>n+'('+c+'回)');
+    return top.length ? g.label+'でよく使う種目: '+top.join('、') : null;
+  }).filter(Boolean).join('\n');
+
+  // 部位バランス
+  const bodyParts = {};
+  all.forEach(s=>{
+    (s.exercises||[]).forEach(e=>{
+      const cat = getExerciseCategorySync(e.name);
+      const label = {chest:'胸',back:'背中',leg:'脚',shoulder:'肩',core:'体幹'}[cat];
+      if(!label) return;
+      if(!bodyParts[cat]) bodyParts[cat]={label, sets:0};
+      bodyParts[cat].sets += (e.sets||[]).length;
+    });
+  });
+
+  // 停滞種目（比較スコープ単位で判定）
+  const scopeMap = {};
+  all.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(s=>{
+    (s.exercises||[]).forEach(e=>{
+      if(e.bodyweight) return;
+      const key = getCompareKey(e.name, s.gym);
+      if(!scopeMap[key]) scopeMap[key]={name:e.name, sessions:[]};
+      scopeMap[key].sessions.push({date:s.date, sets:e.sets||[]});
+    });
+  });
+  const stagnant = Object.values(scopeMap).filter(e=>judgeProgression(e.name, e.sessions).status==='stagnant');
+
+  return buildDetailPrompt(all, null, stagnant, bodyParts, repTrendSummary, sessionDetail, gymExSummary);
 }
 
 
