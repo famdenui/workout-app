@@ -650,7 +650,7 @@ async function syncFromSupabase(){
     if(!res.ok) throw new Error('fetch failed');
     const rows = await res.json();
     const sessions = rows.map(r=>({
-      id: r.id, date: r.date, datetime: r.datetime, gym: r.gym, exercises: r.exercises
+      id: r.id, date: r.date, datetime: r.datetime, startTs: r.start_ts, endTs: r.end_ts, gym: r.gym, exercises: r.exercises
     }));
     const newJson = JSON.stringify(sessions);
     const changed = newJson !== (localStorage.getItem('wt_v2')||'[]');
@@ -680,6 +680,8 @@ async function saveSession(session){
         id: session.id,
         date: session.date,
         datetime: session.datetime,
+        start_ts: session.startTs || null,
+        end_ts: session.endTs || null,
         gym: session.gym,
         exercises: session.exercises
       })
@@ -1331,6 +1333,10 @@ function addSet(ei){
 }
 
 function completeSet(ei, si){
+  // 最初のセット完了をセッション開始時刻として記録
+  if(!localStorage.getItem('wt_session_start')){
+    localStorage.setItem('wt_session_start', String(Date.now()));
+  }
   initAudio(); // iOSのAudioContext初期化（ユーザー操作直後に呼ぶ必要がある）
   const set = exercises[ei].sets[si];
   set.done = !set.done;
@@ -1728,6 +1734,8 @@ async function doSave(){
     id: Date.now(),
     date: selectedDate,
     datetime: sessionTimestamp,
+    startTs: parseInt(localStorage.getItem('wt_session_start')||'0',10) || null,
+    endTs: Date.now(),
     gym: currentGym,
     exercises: exercises.slice().reverse().map(e=>({
       name: e.name,
@@ -1737,6 +1745,7 @@ async function doSave(){
   };
   const ok = await saveSession(session);
   exercises = [];
+  localStorage.removeItem('wt_session_start');
   selectedDate = today();
   updateDateDisplay();
   renderRec();
@@ -1956,7 +1965,9 @@ function setFilter(id){
 function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, sessionDetail, gymExSummary){
   const stagnantNames = stagnant.map(e=>e.name).join('、')||'なし';
   const balanceSummary = bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+':'+b.sets+'セット').join(', ') : '';
-  return `あなたは経験豊富なパーソナルトレーナーです。私のトレーニング履歴を詳しく分析して、丁寧で具体的なフィードバックをください。
+  const latestSession = sessionDetail.split('\n')[0] || 'なし';
+  const pastSessions = sessionDetail.split('\n').slice(1).join('\n') || 'なし';
+  return `あなたは経験豊富なパーソナルトレーナーです。私が今日行ったトレーニングについて、過去の経過を踏まえた具体的なフィードバックをください。
 
 【私のプロフィール】
 - 週3回 エニタイムフィットネス通い（都立大・自由が丘・御嶽山の3拠点、御嶽山は土曜のみ）
@@ -1965,27 +1976,29 @@ function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, se
 - 除外: 腕の肥大を目的とした直接種目（カール等）は優先しない。ラテラルレイズは提案しない
 - 理想の体型: 武田真治（細身で引き締まった筋肉質、胸筋がしっかりあり全身のバランスが良い）
 
-【直近のトレーニング履歴】
-${sessionDetail}
+【今日（最新）のトレーニング ※これが今回の主題】
+${latestSession}
 
-【拠点別のよく使う種目】
+【参考: それ以前の履歴（種目は実施順）】
+${pastSessions}
+
+【参考: 拠点別のよく使う種目】
 ${gymExSummary}
 
-【部位別セット数（直近3ヶ月）】
+【参考: 部位別セット数（直近3ヶ月）】
 ${balanceSummary}
 
-【種目別の重量・レップ数の推移】
+【参考: 種目別の重量・レップ数の推移（@拠点=その拠点のみの比較、(全拠点)=横断比較）】
 ${repTrendSummary||'データ不足'}
 
-【停滞している種目】
+【参考: 停滞している種目】
 ${stagnantNames}
 
-以下の観点で、それぞれ詳しく教えてください：
-1. 今の私のトレーニングの全体的な評価（良い点・改善点）
-2. 目標達成に向けて、各部位で具体的に何を意識すべきか
-3. 停滞を打破するための具体的な提案（重量・レップ・種目の変更など）
-4. 次の1ヶ月で取り組むべき優先事項
-5. フォームや頻度など、その他アドバイスがあれば
+以下の観点で教えてください。あくまで「今日のトレーニング」を主題に、過去データは文脈として使ってください：
+1. 今日のトレーニングの評価（種目の選択・順序・重量・レップは適切だったか）
+2. 過去の推移と比べて、今日の内容から読み取れる進歩や気になる点
+3. 今日の内容を踏まえて、次回のトレーニングで意識すべきこと・具体的なメニュー提案
+4. 回復や頻度の観点で今週気をつけること
 
 会話形式で、励ましも交えながら具体的にお願いします。`;
 }
@@ -2120,7 +2133,14 @@ async function renderHist(){
         <div class="hist-meta">
           <div>
             <div class="hist-date">${fmtDate(s.date)}</div>
-            <div class="hist-day">${dayLabel(s.date)}</div>
+            <div class="hist-day">${dayLabel(s.date)}${(()=>{
+              if(!s.startTs || !s.endTs) return '';
+              const st = new Date(s.startTs), en = new Date(s.endTs);
+              const pad = n=>String(n).padStart(2,'0');
+              const mins = Math.round((s.endTs - s.startTs)/60000);
+              if(mins < 1 || mins > 600) return '';
+              return ' · '+st.getHours()+':'+pad(st.getMinutes())+'〜'+en.getHours()+':'+pad(en.getMinutes())+' ('+mins+'分)';
+            })()}</div>
           </div>
           <div class="hist-gym" style="display:inline-flex;align-items:center;gap:5px">
             <span style="display:inline-flex;width:14px;height:14px;flex-shrink:0">${gym?.icon||''}</span>
