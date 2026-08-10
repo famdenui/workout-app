@@ -450,9 +450,10 @@ document.head.appendChild(link);
       <button class="date-toggle" id="dateToggleBtn" onclick="toggleDatePicker()">過去の日付を入力</button>
     </div>
     <div class="gym-chips" id="gymChips"></div>
-    <div id="sessionTimeBar" style="display:none;align-items:center;gap:6px;margin-bottom:10px;padding:7px 11px;background:rgba(0,199,190,0.08);border:0.5px solid rgba(0,199,190,0.25);border-radius:9px">
-      <span style="display:inline-flex;width:13px;height:13px;color:#00c7be;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
-      <span id="sessionTimeText" style="font-size:12px;font-weight:600;color:#00a89f;font-family:var(--mono)"></span>
+    <div id="sessionTimeBar" onclick="resetSessionStart()" style="display:none;align-items:center;gap:8px;margin-bottom:10px;padding:11px 13px;background:rgba(0,199,190,0.08);border:0.5px solid rgba(0,199,190,0.25);border-radius:11px;cursor:pointer;touch-action:manipulation">
+      <span style="display:inline-flex;width:17px;height:17px;color:#00c7be;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
+      <span id="sessionTimeText" style="font-size:15px;font-weight:600;color:#00a89f;font-family:var(--mono);flex:1"></span>
+      <span style="font-size:10px;color:var(--text4)">タップでリセット</span>
     </div>
     <div class="add-input-wrap">
       <input class="add-input" id="addInput" placeholder="種目を追加..." autocomplete="off"
@@ -1337,6 +1338,14 @@ function addSet(ei){
   const last = exercises[ei].sets[exercises[ei].sets.length-1];
   exercises[ei].sets.push({weight:last.weight, reps:last.reps, done:false, preset:false});
   renderRec();
+}
+
+function resetSessionStart(){
+  if(!localStorage.getItem('wt_session_start')) return;
+  if(!confirm('開始時刻をリセットしますか？\n次のセット完了時に新しい開始時刻が記録されます。')) return;
+  localStorage.removeItem('wt_session_start');
+  updateSessionTimeBar();
+  showToast('開始時刻をリセットしました');
 }
 
 function updateSessionTimeBar(){
