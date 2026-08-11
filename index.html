@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Workout">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1e1b4b">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%231e1b4b'/><stop offset='100%25' stop-color='%235e5ce6'/></linearGradient></defs><rect width='100' height='100' fill='url(%23g)'/><rect x='14' y='46' width='72' height='8' rx='4' fill='rgba(255,255,255,0.15)'/><rect x='14' y='42' width='12' height='16' rx='4' fill='rgba(255,255,255,0.9)'/><rect x='74' y='42' width='12' height='16' rx='4' fill='rgba(255,255,255,0.9)'/><rect x='22' y='36' width='9' height='28' rx='3.5' fill='white'/><rect x='69' y='36' width='9' height='28' rx='3.5' fill='white'/><polyline points='28,80 43,67 57,71 74,56' fill='none' stroke='%2334c759' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/><circle cx='74' cy='56' r='4.5' fill='%2334c759'/></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%230f0e2e'/><stop offset='100%25' stop-color='%232d2a6e'/></linearGradient></defs><rect width='100' height='100' fill='url(%23g)'/><circle cx='50' cy='50' r='30' fill='none' stroke='rgba(255,255,255,0.12)' stroke-width='7'/><path d='M50 20 A30 30 0 1 1 24 65' fill='none' stroke='%2300c7be' stroke-width='7' stroke-linecap='round'/><rect x='38' y='46' width='24' height='8' rx='4' fill='rgba(255,255,255,0.3)'/><rect x='33' y='41' width='7' height='18' rx='3' fill='white'/><rect x='60' y='41' width='7' height='18' rx='3' fill='white'/></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1855,6 +1855,7 @@ async function renderDash(){
     back:    {label:'背中',color:'#007aff',sets:0,target:12},
     leg:     {label:'脚',  color:'#34c759',sets:0,target:9},
     shoulder:{label:'肩',  color:'#ff9500',sets:0,target:6},
+    arm:     {label:'腕',  color:'#ff3b30',sets:0,target:4},
     core:    {label:'体幹',color:'#00c7be',sets:0,target:6},
   };
   recent.forEach(s=>s.exercises.forEach(e=>{
@@ -2121,7 +2122,7 @@ function buildPromptFromDB(){
   all.forEach(s=>{
     (s.exercises||[]).forEach(e=>{
       const cat = getExerciseCategorySync(e.name);
-      const label = {chest:'胸',back:'背中',leg:'脚',shoulder:'肩',core:'体幹'}[cat];
+      const label = {chest:'胸',back:'背中',leg:'脚',shoulder:'肩',arm:'腕',core:'体幹'}[cat];
       if(!label) return;
       if(!bodyParts[cat]) bodyParts[cat]={label, sets:0};
       bodyParts[cat].sets += (e.sets||[]).length;
@@ -2500,4 +2501,3 @@ init();
 </script>
 </body>
 </html>
-
