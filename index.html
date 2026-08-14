@@ -1103,6 +1103,84 @@ function hideSuggest(){
   document.getElementById('addInput').value = '';
 }
 
+// 今日この拠点でおすすめの種目を算出（ローカルヒューリスティック）
+function getTodayRecommendations(gymId){
+  const db = getDB();
+  if(!db.length) return [];
+  const now = new Date();
+  const cutoff3m = new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
+  const recent = db.filter(s=>new Date(s.date+'T00:00:00') >= cutoff3m);
+
+  // 部位ごとの最終実施日と直近3ヶ月セット数
+  const partLast = {};   // cat -> 最後にやった日からの経過日数
+  const partSets = {};   // cat -> セット数合計
+  const todayStr = today();
+  recent.forEach(s=>{
+    const days = Math.floor((new Date(todayStr+'T00:00:00') - new Date(s.date+'T00:00:00'))/(1000*60*60*24));
+    s.exercises.forEach(e=>{
+      const cat = getExerciseCategorySync(e.name);
+      partSets[cat] = (partSets[cat]||0) + e.sets.length;
+      if(partLast[cat]===undefined || days < partLast[cat]) partLast[cat] = days;
+    });
+  });
+
+  // 部位のバランス目標（サマリーと同じ比率）
+  const targets = {chest:12, back:12, leg:9, shoulder:6, arm:4, core:6};
+
+  // この拠点で実施実績のある種目を候補に
+  const gymSessions = db.filter(s=>s.gym===gymId);
+  const candidates = {};
+  gymSessions.forEach(s=>{
+    s.exercises.forEach(e=>{
+      if(!candidates[e.name]) candidates[e.name] = {name:e.name};
+    });
+  });
+
+  const added = exercises.map(e=>e.name);
+  const scored = Object.values(candidates)
+    .filter(c=>!added.includes(c.name))
+    .map(c=>{
+      const cat = getExerciseCategorySync(c.name);
+      let score = 0;
+      const reasons = [];
+
+      // 回復状態: 部位の経過日数（0-1日は除外級の減点、2日以上で加点）
+      const daysSince = partLast[cat] !== undefined ? partLast[cat] : 99;
+      if(daysSince <= 1){ score -= 100; }
+      else { score += Math.min(daysSince, 7) * 10; if(daysSince>=4) reasons.push('中'+daysSince+'日・回復済み'); }
+
+      // バランス不足: 目標比の不足率
+      const tgt = targets[cat];
+      if(tgt){
+        const ratio = (partSets[cat]||0) / tgt;
+        if(ratio < 0.7){
+          score += 30;
+          const lbl = {chest:'胸',back:'背中',leg:'脚',shoulder:'肩',arm:'腕',core:'体幹'}[cat];
+          if(lbl) reasons.push(lbl+'が不足気味');
+        }
+      }
+
+      // progressionステータス
+      const compareKey = getCompareKey(c.name, gymId);
+      const hist = db
+        .filter(s=>getCompareKey(c.name, s.gym)===compareKey)
+        .map(s=>{ const e2=s.exercises.find(x=>x.name===c.name); return e2?{date:s.date, sets:e2.sets||[]}:null; })
+        .filter(Boolean)
+        .sort((a,b)=>new Date(a.date)-new Date(b.date));
+      if(hist.length>=2){
+        const prog = judgeProgression(c.name, hist);
+        if(prog.status==='increase'){ score += 50; reasons.unshift('増量推奨'); }
+        else if(prog.status==='stagnant'){ score += 25; reasons.push('停滞打破を'); }
+      }
+
+      return {name:c.name, score, reason: reasons[0]||''};
+    })
+    .filter(c=>c.score > 0)
+    .sort((a,b)=>b.score-a.score);
+
+  return scored.slice(0,5);
+}
+
 function filterSuggest(){
   const val = document.getElementById('addInput').value.trim().toLowerCase();
   const master = getExerciseMaster(currentGym);
@@ -1144,6 +1222,28 @@ function filterSuggest(){
   };
 
   let html = '';
+  // 入力が空の時は「今日のおすすめ」を最上部に
+  if(!val){
+    const recs = getTodayRecommendations(currentGym);
+    if(recs.length){
+      html += `<div class="suggest-header" style="display:flex;align-items:center;gap:5px;color:var(--accent)"><span style="display:inline-flex;width:13px;height:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/></svg></span>今日のおすすめ</div>`;
+      html += recs.map(r=>{
+        const prev = prevData[r.name]?.[currentGym];
+        const prevStr = prev ? prev.map(s=>s.weight+'×'+s.reps).join(' · ') : '記録なし';
+        const {icon, lightColor} = getIconWithColor(r.name);
+        const reasonChip = r.reason ? `<span style="font-size:9px;color:var(--accent);background:rgba(94,92,230,0.08);border:0.5px solid rgba(94,92,230,0.25);padding:1px 6px;border-radius:99px;margin-left:5px;font-weight:600">${r.reason}</span>` : '';
+        return `<div class="suggest-item" onclick="addExerciseFromSuggest('${r.name}')">
+          <div class="suggest-ico" style="background:${lightColor}">${icon}</div>
+          <div style="flex:1;min-width:0">
+            <div class="suggest-name">${r.name}${reasonChip}</div>
+            <div class="suggest-prev">${prevStr}</div>
+          </div>
+          <div class="suggest-add">＋</div>
+        </div>`;
+      }).join('');
+      html += `<div class="suggest-divider"></div>`;
+    }
+  }
   if(items.length){
     const cg=GYMS.find(g=>g.id===currentGym);
     html += `<div class="suggest-header" style="display:flex;align-items:center;gap:5px"><span style="display:inline-flex;width:13px;height:13px">${cg?.icon||''}</span>${cg?.label||''}でよく使う種目</div>`;
