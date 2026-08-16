@@ -390,7 +390,7 @@ document.head.appendChild(link);
       <div class="segs" id="timerSegs"></div>
       <div class="seg-info">
         <div class="seg-lbl" id="segLbl">セット 1/3</div>
-        <div class="seg-lbl" id="durLbl">90秒</div>
+        <div class="seg-lbl" id="durLbl">120秒</div>
       </div>
     </div>
     <div class="adj-row">
@@ -416,7 +416,7 @@ document.head.appendChild(link);
           <div style="font-size:13px;color:var(--text)">インターバル時間</div>
           <div style="display:flex;align-items:center;gap:8px">
             <button class="num-ctrl-btn" onclick="settingsAdjustDur(-10)" style="width:32px;height:32px;font-size:18px">−</button>
-            <div id="settingsDurLbl" style="font-size:16px;font-weight:600;color:var(--text);font-family:var(--mono);min-width:56px;text-align:center">90秒</div>
+            <div id="settingsDurLbl" style="font-size:16px;font-weight:600;color:var(--text);font-family:var(--mono);min-width:56px;text-align:center">120秒</div>
             <button class="num-ctrl-btn" onclick="settingsAdjustDur(10)" style="width:32px;height:32px;font-size:18px">＋</button>
           </div>
         </div>
@@ -623,7 +623,7 @@ let currentGym = 'toritsu';
 let exercises = [];
 let timerInterval = null;
 let timerSec = 0;
-let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'90', 10); // 設定値（恒久）
+let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'120', 10); // 設定値（恒久）
 let sessionDur = timerDur; // 現在のタイマー1回分の実効値（±ボタンでの一時調整を含む）
 let timerRunning = false;
 let timerExIdx = -1;
@@ -2110,7 +2110,7 @@ function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, se
 - マシン中心のトレーニング
 - 目標: 姿勢改善 / 胸の厚み / なで肩フォルムの維持。全身をバランスよく整えたく脚も重視
 - 除外: 腕の肥大を目的とした直接種目（カール等）は優先しない。ラテラルレイズは提案しない
-- 理想の体型: 武田真治（細身で引き締まった筋肉質、胸筋がしっかりあり全身のバランスが良い）
+- 目指す体型: 全身バランスの良い細め筋肉質。肩幅を広げることは望まない（ラテラルレイズ等で三角筋中部を大きくしない）。姿勢の改善を重視
 
 【今日（最新）のトレーニング ※これが今回の主題】
 ${latestSession}
@@ -2577,7 +2577,6 @@ async function doDelete(){
   renderHist();
   showToast('削除しました');
 }
-  
 
 // --- SCREEN NAV ---
 function showScreen(id, btn){
