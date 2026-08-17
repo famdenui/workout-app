@@ -912,7 +912,10 @@ function judgeProgression(name, sessionsAsc){
   if(last.allHit && prev.allHit && last.maxW === prev.maxW){
     // 全セッションで重量0＝純粋な自重種目は加重かレップ目標引き上げを提案
     const allZero = recs.every(r=>r.maxW===0);
-    const detail = allZero ? '加重かレップ目標増を検討' : '+'+getIncrement(name)+'kg で次へ';
+    const assisted = last.maxW < 0;
+    const detail = assisted ? 'アシストを'+Math.min(5, Math.abs(last.maxW))+'kg減らす'
+                 : allZero ? '加重かレップ目標増を検討'
+                 : '+'+getIncrement(name)+'kg で次へ';
     return {status:'increase', label:'増量推奨', detail};
   }
 
@@ -1275,6 +1278,14 @@ function addCustomExercise(){
   if(val) addExerciseByName(val);
 }
 
+// 自重種目の重量ラベル（負=アシスト、0=自重のみ、正=加重）
+function bwLabel(w, unit){
+  const u = unit===false ? '' : 'kg';
+  if(w < 0) return 'アシスト'+Math.abs(w)+u;
+  if(w > 0) return '自重+'+w+u;
+  return '自重';
+}
+
 // 過去の記録から自重フラグを取得（最新の記録を優先）
 function getPrevBodyweightFlag(name){
   const sessions = getDB();
@@ -1362,7 +1373,7 @@ function toggleBodyweight(ei){
 }
 
 // 自重種目の名前パターン（新規追加時の自動判定用）
-const BODYWEIGHT_PATTERNS = ['懸垂','チンニング','プルアップ','ディップス','バックエクステンション','プッシュアップ','腕立て','プランク','レッグレイズ','クランチ','シットアップ','ハイパーエクステンション'];
+const BODYWEIGHT_PATTERNS = ['懸垂','チンニング','プルアップ','ディップス','バックエクステンション','プッシュアップ','腕立て','プランク','レッグレイズ','クランチ','シットアップ','ハイパーエクステンション','アシスト'];
 function isLikelyBodyweight(name){
   return BODYWEIGHT_PATTERNS.some(p=>name.includes(p));
 }
@@ -1388,9 +1399,9 @@ function syncWeightForward(ei, si, v){
 
 function setVal(ei, si, field, raw){
   const step = field==='weight' ? 0.5 : 1;
-  const minW = exercises[ei].bodyweight ? 0 : 0.5;
+  const minW = exercises[ei].bodyweight ? -100 : 0.5;
   let v = parseFloat(raw);
-  if(isNaN(v)) v = field==='weight' ? minW : step;
+  if(isNaN(v)) v = field==='weight' ? 0 : step;
   if(field==='weight') v = Math.max(minW, Math.round(v*2)/2);
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
@@ -1404,8 +1415,8 @@ function setVal(ei, si, field, raw){
 function changeVal(ei, si, field, delta){
   const step = field==='weight' ? 0.5 : 1;
   let v = exercises[ei].sets[si][field] + delta*step;
-  // 自重種目は加重0（＝純粋な自重）を許可する
-  const minW = exercises[ei].bodyweight ? 0 : 0.5;
+  // 自重種目はマイナス（アシスト）〜プラス（加重）を許可
+  const minW = exercises[ei].bodyweight ? -100 : 0.5;
   if(field==='weight') v = Math.max(minW, Math.round(v*2)/2);
   else v = Math.max(1, Math.round(v));
   exercises[ei].sets[si][field] = v;
@@ -1499,7 +1510,7 @@ function renderRec(){
   list.innerHTML = exercises.map((ex,ei)=>{
     const prev = getPrevSets(ex.name);
     const prevStr = prev ? prev.map(s=>{
-      if(ex.bodyweight) return (s.weight>0?'自重+'+s.weight+'kg':'自重')+'×'+s.reps;
+      if(ex.bodyweight) return bwLabel(s.weight)+'×'+s.reps;
       return s.weight+'kg×'+s.reps;
     }).join(' · ') : '前回記録なし';
     // double progressionステータス（同一比較スコープの履歴から判定）
@@ -1525,8 +1536,8 @@ function renderRec(){
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',-1)">−</button>
           <input class="num-direct" type="number" inputmode="decimal" value="${s.weight}"
             onchange="setVal(${ei},${si},'weight',this.value)"
-            onfocus="this.select()" style="width:42px">
-          <span style="font-size:10px;color:#00c7be;font-weight:600">+kg</span>
+            onfocus="this.select()" style="width:48px">
+          <span style="font-size:10px;color:#00c7be;font-weight:600">kg</span>
           <button class="num-ctrl-btn" onclick="changeVal(${ei},${si},'weight',1)">＋</button>
         </div>` : `
         <div class="num-ctrl">
@@ -1764,7 +1775,7 @@ function updateTimerUI(){
   if(nextSet){
     document.getElementById('timerNextEx').textContent = ex.name;
     const timerEx = exercises[timerExIdx];
-    const wLabel = (timerEx && timerEx.bodyweight) ? (nextSet.weight>0?'自重+'+nextSet.weight+'kg':'自重') : nextSet.weight+'kg';
+    const wLabel = (timerEx && timerEx.bodyweight) ? bwLabel(nextSet.weight) : nextSet.weight+'kg';
     document.getElementById('timerNextSet').textContent = wLabel+' × '+nextSet.reps+'回';
   } else {
     document.getElementById('timerNextEx').textContent = '次の種目へ';
@@ -2112,6 +2123,11 @@ function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, se
 - 除外: 腕の肥大を目的とした直接種目（カール等）は優先しない。ラテラルレイズは提案しない
 - 目指す体型: 全身バランスの良い細め筋肉質。肩幅を広げることは望まない（ラテラルレイズ等で三角筋中部を大きくしない）。姿勢の改善を重視
 
+【記録の見方】
+- 「アシスト30kg」= アシストマシンで30kg補助を受けた状態。数値が小さくなるほど自力に近づき進歩を意味する（30kg→20kg は進歩）
+- 「自重」= 補助も加重もなし
+- 「自重+5kg」= 加重ベルト等で5kg追加
+
 【今日（最新）のトレーニング ※これが今回の主題】
 ${latestSession}
 
@@ -2171,7 +2187,7 @@ function buildPromptFromDB(){
     const exList2 = (s.exercises||[]).map(e=>{
       const sets = e.sets||[];
       if(e.bodyweight){
-        const setStr = sets.map(st=>(st.weight>0?'自重+'+st.weight+'kg':'自重')+'×'+st.reps+'rep').join(' / ');
+        const setStr = sets.map(st=>bwLabel(st.weight)+'×'+st.reps+'rep').join(' / ');
         return e.name+'(自重種目)['+setStr+']';
       }
       const setStr = sets.map(st=>st.weight+'kg×'+st.reps+'rep').join(' / ');
@@ -2259,7 +2275,7 @@ async function renderHist(){
     const more = s.exercises.length>3 ? `<span class="hist-more">+${s.exercises.length-3}</span>` : '';
     const detail = s.exercises.map(e=>{
       const sets = e.sets.map(st=>{
-        const w = e.bodyweight ? (st.weight>0?'自重+'+st.weight:'自重') : st.weight;
+        const w = e.bodyweight ? bwLabel(st.weight,false) : st.weight;
         return `<span class="hist-dset">${w}×${st.reps}</span>`;
       }).join('');
       return `<div class="hist-dr"><div class="hist-dn">${e.name}${e.bodyweight?'<span style="font-size:9px;color:#00c7be;margin-left:4px">自重</span>':''}</div><div class="hist-ds">${sets}</div></div>`;
