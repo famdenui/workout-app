@@ -347,6 +347,26 @@ document.head.appendChild(link);
 <body>
 
 <!-- TIMER FULLSCREEN -->
+<div class="timer-screen" id="authScreen" style="justify-content:center;padding:0 28px">
+  <div style="width:100%;max-width:340px">
+    <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#5e5ce6,#00c7be);display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
+      <span style="display:inline-flex;width:28px;height:28px;color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+    </div>
+    <div style="font-size:19px;font-weight:600;color:var(--text);text-align:center;margin-bottom:7px">ログイン</div>
+    <div style="font-size:12px;color:var(--text3);text-align:center;line-height:1.6;margin-bottom:22px">メールにログインリンクが届きます。<br>パスワードは不要です。</div>
+    <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス"
+      style="width:100%;padding:13px 14px;border-radius:11px;border:0.5px solid var(--border2);background:var(--surface);font-size:15px;font-family:var(--font);color:var(--text);margin-bottom:10px">
+    <button id="authSendBtn" onclick="sendMagicLink()"
+      style="width:100%;padding:13px;border-radius:11px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">ログインリンクを送る</button>
+    <div id="authSent" style="display:none;margin-top:12px;padding:11px;border-radius:10px;background:rgba(52,199,89,0.09);border:0.5px solid rgba(52,199,89,0.3);font-size:12px;color:#1e8e3e;line-height:1.6;text-align:center">
+      メールを送信しました。<br>リンクを開くとログインが完了します。
+    </div>
+    <div style="text-align:center;margin-top:18px">
+      <span onclick="skipLogin()" style="font-size:12px;color:var(--text4);cursor:pointer;text-decoration:underline;touch-action:manipulation">ログインせずに使う</span>
+    </div>
+  </div>
+</div>
+
 <div class="timer-screen" id="timerScreen">
   <div class="timer-top">
     <div class="timer-back" onclick="minimizeTimer()" style="display:flex;align-items:center;gap:4px;color:var(--accent);font-size:13px;font-weight:500;cursor:pointer;touch-action:manipulation">
@@ -408,6 +428,11 @@ document.head.appendChild(link);
   <div class="screen" id="screen-settings">
     <div class="page-title">設定</div>
     <div class="page-sub">拠点の管理</div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">アカウント</div>
+      <div id="authSettings" style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px"></div>
+    </div>
 
     <div class="settings-section">
       <div class="settings-section-title">インターバルタイマー</div>
@@ -636,12 +661,109 @@ const SUPABASE_URL = 'https://zttzdfdpnpzvtkevhjid.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0dHpkZmRwbnB6dnRrZXZoamlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MzQyNTAsImV4cCI6MjA5NzAxMDI1MH0.ry3bhv3hx4uwasYfInbYI0qSX5Vu0m1cXsE6LPh9Lkc';
 
 function sbHeaders(){
+  // ログイン済みならユーザーのトークン、未ログインならanonキー（従来動作）
+  const token = (_auth && _auth.accessToken) ? _auth.accessToken : SUPABASE_KEY;
   return {
     'Content-Type': 'application/json',
     'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Authorization': 'Bearer ' + token,
     'Prefer': 'return=minimal'
   };
+}
+
+// ============ AUTH（Supabase マジックリンク）============
+let _auth = null;
+try{ _auth = JSON.parse(localStorage.getItem('wt_auth')||'null'); }catch(e){}
+
+function isLoggedIn(){ return !!(_auth && _auth.accessToken); }
+function currentUserId(){ return (_auth && _auth.userId) || null; }
+
+function saveAuth(a){
+  _auth = a;
+  if(a) localStorage.setItem('wt_auth', JSON.stringify(a));
+  else localStorage.removeItem('wt_auth');
+  try{ renderAuthSettings(); }catch(e){}
+}
+
+function decodeJwt(t){
+  try{
+    const p = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(decodeURIComponent(escape(atob(p))));
+  }catch(e){ return null; }
+}
+
+// マジックリンクから戻ってきた時、URLハッシュのトークンを取り込む
+function captureAuthFromHash(){
+  if(!location.hash || location.hash.indexOf('access_token')===-1) return false;
+  const p = new URLSearchParams(location.hash.slice(1));
+  const at = p.get('access_token'), rt = p.get('refresh_token');
+  if(!at) return false;
+  const payload = decodeJwt(at);
+  saveAuth({accessToken:at, refreshToken:rt, userId:payload&&payload.sub, email:(payload&&payload.email)||'', exp:(payload&&payload.exp)||0});
+  history.replaceState(null,'',location.pathname+location.search);
+  return true;
+}
+
+async function refreshAuth(){
+  if(!_auth || !_auth.refreshToken) return false;
+  try{
+    const res = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
+      body: JSON.stringify({refresh_token:_auth.refreshToken})
+    });
+    if(!res.ok){ return false; }
+    const d = await res.json();
+    const payload = decodeJwt(d.access_token);
+    saveAuth({accessToken:d.access_token, refreshToken:d.refresh_token, userId:(payload&&payload.sub)||currentUserId(), email:(payload&&payload.email)||_auth.email, exp:(payload&&payload.exp)||0});
+    return true;
+  }catch(e){ return false; }
+}
+
+// 期限が近ければ先に更新（Supabaseアクセス前に呼ぶ）
+async function ensureFreshToken(){
+  if(!isLoggedIn()) return;
+  const now = Math.floor(Date.now()/1000);
+  if(_auth.exp && _auth.exp - now < 120) await refreshAuth();
+}
+
+async function sendMagicLink(){
+  const input = document.getElementById('authEmail');
+  const email = (input.value||'').trim();
+  if(!email || email.indexOf('@')===-1){ showToast('メールアドレスを入力してください'); return; }
+  const btn = document.getElementById('authSendBtn');
+  btn.disabled = true; btn.textContent = '送信中...';
+  const redirect = location.origin + location.pathname;
+  try{
+    const res = await fetch(SUPABASE_URL+'/auth/v1/otp?redirect_to='+encodeURIComponent(redirect),{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
+      body: JSON.stringify({email, create_user:true})
+    });
+    if(!res.ok){ throw new Error(await res.text()); }
+    document.getElementById('authSent').style.display='block';
+    btn.textContent = '再送する';
+  }catch(e){
+    console.error('magic link error', e);
+    showToast('送信に失敗しました');
+    btn.textContent = 'ログインリンクを送る';
+  }
+  btn.disabled = false;
+}
+
+function logout(){
+  if(!confirm('ログアウトしますか？\n端末内の記録は残ります。')) return;
+  saveAuth(null);
+  showToast('ログアウトしました');
+}
+
+function skipLogin(){
+  localStorage.setItem('wt_auth_skip','1');
+  document.getElementById('authScreen').classList.remove('on');
+}
+
+function openLogin(){
+  document.getElementById('authScreen').classList.add('on');
 }
 
 // DB読み込み：localStorageから即時返す（同期）
@@ -651,6 +773,7 @@ function getDB(){
 
 // Supabaseからデータを取得してlocalStorageに同期
 async function syncFromSupabase(){
+  await ensureFreshToken();
   try{
     const res = await fetch(SUPABASE_URL+'/rest/v1/sessions?select=*&order=date.asc', {
       headers: sbHeaders()
@@ -672,6 +795,7 @@ async function syncFromSupabase(){
 
 // DB保存（Supabase + localStorageバックアップ）
 async function saveSession(session){
+  await ensureFreshToken();
   // localStorageバックアップ
   try{
     const local = JSON.parse(localStorage.getItem('wt_v2')||'[]');
@@ -688,6 +812,7 @@ async function saveSession(session){
         id: session.id,
         date: session.date,
         datetime: session.datetime,
+        user_id: currentUserId(),
         start_ts: session.startTs || null,
         end_ts: session.endTs || null,
         gym: session.gym,
@@ -1022,6 +1147,14 @@ function toggleDatePicker(){
 }
 
 function init(){
+  // マジックリンクからの復帰トークンを取り込む
+  const justLoggedIn = captureAuthFromHash();
+  if(justLoggedIn) showToast('ログインしました');
+  ensureFreshToken();
+  // 未ログインかつスキップ未選択なら、ログイン画面を表示
+  if(!isLoggedIn() && !localStorage.getItem('wt_auth_skip')){
+    setTimeout(()=>{ document.getElementById('authScreen').classList.add('on'); }, 300);
+  }
 
   // --- データマイグレーション（旧キーwt_sessionsから新キーwt_v2へ）---
   try{
@@ -2360,6 +2493,33 @@ document.addEventListener('click', ()=>{
 // --- SETTINGS / TIMER ---
 const DUR_PRESETS = [30, 60, 90, 120, 150, 180];
 
+function renderAuthSettings(){
+  const el = document.getElementById('authSettings');
+  if(!el) return;
+  if(isLoggedIn()){
+    el.innerHTML =
+      '<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">'+
+        '<span style="width:8px;height:8px;border-radius:50%;background:#34c759;flex-shrink:0"></span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis">'+(_auth.email||'ログイン中')+'</div>'+
+          '<div style="font-size:10px;color:var(--text4);margin-top:2px">クラウド同期が有効です</div>'+
+        '</div>'+
+      '</div>'+
+      '<div onclick="copyUserId()" style="font-size:10px;color:var(--text4);font-family:var(--mono);background:var(--bg);padding:7px 9px;border-radius:7px;margin-bottom:10px;word-break:break-all;cursor:pointer">ID: '+(currentUserId()||'—')+'<span style="color:var(--accent);margin-left:6px">コピー</span></div>'+
+      '<button onclick="logout()" style="width:100%;padding:10px;border-radius:9px;border:0.5px solid var(--border2);background:var(--bg);color:#ff3b30;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">ログアウト</button>';
+  } else {
+    el.innerHTML =
+      '<div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:11px">未ログインです。ログインすると記録が自分のアカウントに紐づき、他のアプリとも共有できます。</div>'+
+      '<button onclick="openLogin()" style="width:100%;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">ログイン</button>';
+  }
+}
+
+function copyUserId(){
+  const id = currentUserId();
+  if(!id) return;
+  navigator.clipboard.writeText(id).then(()=>showToast('ユーザーIDをコピーしました')).catch(()=>{});
+}
+
 function renderDurSettings(){
   const lbl = document.getElementById('settingsDurLbl');
   if(lbl) lbl.textContent = timerDur+'秒';
@@ -2602,7 +2762,7 @@ function showScreen(id, btn){
   btn.classList.add('on');
   if(id==='dash'){ syncFromSupabase().then(r=>{ if(r&&r.changed) renderDash(); }); renderDash(); }
   if(id==='hist'){ syncFromSupabase().then(r=>{ if(r&&r.changed) renderHist(); }); renderHist(); }
-  if(id==='settings'){ renderGymSettings(); renderDurSettings(); }
+  if(id==='settings'){ renderGymSettings(); renderDurSettings(); renderAuthSettings(); }
 }
 
 // --- TOAST ---
