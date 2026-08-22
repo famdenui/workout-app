@@ -352,16 +352,24 @@ document.head.appendChild(link);
     <div style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#5e5ce6,#00c7be);display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
       <span style="display:inline-flex;width:28px;height:28px;color:#fff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
     </div>
-    <div style="font-size:19px;font-weight:600;color:var(--text);text-align:center;margin-bottom:7px">ログイン</div>
-    <div style="font-size:12px;color:var(--text3);text-align:center;line-height:1.6;margin-bottom:22px">メールにログインリンクが届きます。<br>パスワードは不要です。</div>
+    <div id="authTitle" style="font-size:19px;font-weight:600;color:var(--text);text-align:center;margin-bottom:7px">ログイン</div>
+    <div id="authDesc" style="font-size:12px;color:var(--text3);text-align:center;line-height:1.6;margin-bottom:22px">記録をアカウントに紐づけて、<br>他のアプリとも共有できます。</div>
+
     <input id="authEmail" type="email" inputmode="email" autocomplete="email" placeholder="メールアドレス"
-      style="width:100%;padding:13px 14px;border-radius:11px;border:0.5px solid var(--border2);background:var(--surface);font-size:15px;font-family:var(--font);color:var(--text);margin-bottom:10px">
-    <button id="authSendBtn" onclick="sendMagicLink()"
-      style="width:100%;padding:13px;border-radius:11px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">ログインリンクを送る</button>
-    <div id="authSent" style="display:none;margin-top:12px;padding:11px;border-radius:10px;background:rgba(52,199,89,0.09);border:0.5px solid rgba(52,199,89,0.3);font-size:12px;color:#1e8e3e;line-height:1.6;text-align:center">
-      メールを送信しました。<br>リンクを開くとログインが完了します。
+      style="width:100%;padding:13px 14px;border-radius:11px;border:0.5px solid var(--border2);background:var(--surface);font-size:15px;font-family:var(--font);color:var(--text);margin-bottom:9px">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="パスワード（6文字以上）"
+      onkeydown="if(event.key==='Enter') submitAuth()"
+      style="width:100%;padding:13px 14px;border-radius:11px;border:0.5px solid var(--border2);background:var(--surface);font-size:15px;font-family:var(--font);color:var(--text);margin-bottom:12px">
+
+    <button id="authSubmitBtn" onclick="submitAuth()"
+      style="width:100%;padding:13px;border-radius:11px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">ログイン</button>
+
+    <div id="authNotice" style="display:none;margin-top:12px;padding:11px;border-radius:10px;background:rgba(52,199,89,0.09);border:0.5px solid rgba(52,199,89,0.3);font-size:12px;color:#1e8e3e;line-height:1.6;text-align:center"></div>
+
+    <div style="text-align:center;margin-top:16px">
+      <span id="authToggle" onclick="toggleAuthMode()" style="font-size:12px;color:var(--accent);cursor:pointer;touch-action:manipulation">アカウントを新規作成</span>
     </div>
-    <div style="text-align:center;margin-top:18px">
+    <div style="text-align:center;margin-top:14px">
       <span onclick="skipLogin()" style="font-size:12px;color:var(--text4);cursor:pointer;text-decoration:underline;touch-action:manipulation">ログインせずに使う</span>
     </div>
   </div>
@@ -727,28 +735,93 @@ async function ensureFreshToken(){
   if(_auth.exp && _auth.exp - now < 120) await refreshAuth();
 }
 
-async function sendMagicLink(){
-  const input = document.getElementById('authEmail');
-  const email = (input.value||'').trim();
-  if(!email || email.indexOf('@')===-1){ showToast('メールアドレスを入力してください'); return; }
-  const btn = document.getElementById('authSendBtn');
-  btn.disabled = true; btn.textContent = '送信中...';
-  const redirect = location.origin + location.pathname;
+let _authMode = 'login'; // 'login' or 'signup'
+
+function toggleAuthMode(){
+  _authMode = _authMode==='login' ? 'signup' : 'login';
+  const isSignup = _authMode==='signup';
+  document.getElementById('authTitle').textContent = isSignup ? 'アカウント作成' : 'ログイン';
+  document.getElementById('authSubmitBtn').textContent = isSignup ? 'アカウントを作成' : 'ログイン';
+  document.getElementById('authToggle').textContent = isSignup ? 'ログインに戻る' : 'アカウントを新規作成';
+  document.getElementById('authPassword').setAttribute('autocomplete', isSignup ? 'new-password' : 'current-password');
+  document.getElementById('authNotice').style.display = 'none';
+}
+
+function showAuthNotice(msg, ok){
+  const el = document.getElementById('authNotice');
+  el.innerHTML = msg;
+  el.style.background = ok===false ? 'rgba(255,59,48,0.08)' : 'rgba(52,199,89,0.09)';
+  el.style.borderColor = ok===false ? 'rgba(255,59,48,0.3)' : 'rgba(52,199,89,0.3)';
+  el.style.color = ok===false ? '#c92a2a' : '#1e8e3e';
+  el.style.display = 'block';
+}
+
+async function submitAuth(){
+  const email = (document.getElementById('authEmail').value||'').trim();
+  const password = document.getElementById('authPassword').value||'';
+  if(!email || email.indexOf('@')===-1){ showAuthNotice('メールアドレスを入力してください', false); return; }
+  if(password.length < 6){ showAuthNotice('パスワードは6文字以上で入力してください', false); return; }
+
+  const btn = document.getElementById('authSubmitBtn');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '処理中...';
+
   try{
-    const res = await fetch(SUPABASE_URL+'/auth/v1/otp?redirect_to='+encodeURIComponent(redirect),{
-      method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
-      body: JSON.stringify({email, create_user:true})
-    });
-    if(!res.ok){ throw new Error(await res.text()); }
-    document.getElementById('authSent').style.display='block';
-    btn.textContent = '再送する';
+    if(_authMode === 'signup'){
+      const res = await fetch(SUPABASE_URL+'/auth/v1/signup',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
+        body: JSON.stringify({email, password})
+      });
+      const d = await res.json();
+      if(!res.ok) throw new Error(d.msg || d.error_description || d.message || '作成に失敗しました');
+      if(d.access_token){
+        applySession(d, email);
+      } else {
+        // メール確認が必要な設定の場合
+        showAuthNotice('確認メールを送りました。<br>メール内のリンクを開いて有効化したあと、<br>このアプリでログインしてください。');
+        _authMode = 'login';
+        document.getElementById('authTitle').textContent = 'ログイン';
+        document.getElementById('authSubmitBtn').textContent = 'ログイン';
+        document.getElementById('authToggle').textContent = 'アカウントを新規作成';
+      }
+    } else {
+      const res = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
+        body: JSON.stringify({email, password})
+      });
+      const d = await res.json();
+      if(!res.ok) throw new Error(d.msg || d.error_description || d.message || 'ログインに失敗しました');
+      applySession(d, email);
+    }
   }catch(e){
-    console.error('magic link error', e);
-    showToast('送信に失敗しました');
-    btn.textContent = 'ログインリンクを送る';
+    console.error('auth error', e);
+    const m = String(e.message||'');
+    if(m.indexOf('Invalid login')!==-1) showAuthNotice('メールアドレスかパスワードが違います', false);
+    else if(m.indexOf('already registered')!==-1) showAuthNotice('このメールは登録済みです。ログインしてください', false);
+    else if(m.indexOf('not confirmed')!==-1) showAuthNotice('メールの確認が完了していません', false);
+    else showAuthNotice(m || 'エラーが発生しました', false);
   }
-  btn.disabled = false;
+  btn.disabled = false; btn.textContent = original;
+}
+
+function applySession(d, email){
+  const payload = decodeJwt(d.access_token);
+  saveAuth({
+    accessToken: d.access_token,
+    refreshToken: d.refresh_token,
+    userId: payload && payload.sub,
+    email: (payload && payload.email) || email,
+    exp: (payload && payload.exp) || 0
+  });
+  localStorage.setItem('wt_auth_email', email);
+  localStorage.removeItem('wt_auth_skip');
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authNotice').style.display = 'none';
+  document.getElementById('authScreen').classList.remove('on');
+  showToast('ログインしました');
+  syncFromSupabase().then(r=>{ if(r && r.changed) renderRec(); });
 }
 
 function logout(){
@@ -1147,7 +1220,13 @@ function toggleDatePicker(){
 }
 
 function init(){
-  // マジックリンクからの復帰トークンを取り込む
+  // 前回のメールアドレスを復元
+  try{
+    const savedEmail = localStorage.getItem('wt_auth_email');
+    const el = document.getElementById('authEmail');
+    if(savedEmail && el) el.value = savedEmail;
+  }catch(e){}
+  // マジックリンク経由（Safari）で戻った場合のフォールバック
   const justLoggedIn = captureAuthFromHash();
   if(justLoggedIn) showToast('ログインしました');
   ensureFreshToken();
