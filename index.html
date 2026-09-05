@@ -1004,11 +1004,43 @@ const EXERCISE_CATEGORY_PRESET = {
   'アブドミナル':'core','ロータリートルソー':'core','トーソローテーション':'core',
   'スミスマシン':'default',
 };
+// 名前からカテゴリを推定（AIに頼らないオフライン判定）
+// 上から順に評価するので、より限定的なパターンを先に置くこと
+const CATEGORY_PATTERNS = [
+  // 脚（「レッグカール」を腕と誤判定しないよう最優先）
+  {p:['レッグプレス','レッグエクステンション','レッグカール','レッグアダクション','レッグアブダクション','スクワット','カーフレイズ','ランジ','ヒップスラスト','アダクション','アブダクション','グルート','ハムストリング'], c:'leg'},
+  // 体幹（レッグレイズは脚ではなく腹筋）
+  {p:['アブドミナル','クランチ','シットアップ','プランク','レッグレイズ','トーソ','ロータリー','アブローラー','腹筋'], c:'core'},
+  // 腕（三頭）
+  {p:['プレスダウン','プッシュダウン','キックバック','トライセプス','フレンチプレス','スカルクラッシャー','ナローベンチ','三頭'], c:'arm'},
+  // 腕（二頭）
+  {p:['カール','バイセプス','二頭'], c:'arm'},
+  // 肩
+  {p:['ショルダープレス','サイドレイズ','ラテラルレイズ','フロントレイズ','リアレイズ','リアデルト','アップライトロウ','シュラッグ','オーバーヘッドプレス','デルトイド'], c:'shoulder'},
+  // 胸
+  {p:['チェストプレス','ベンチプレス','チェストフライ','ペックフライ','ペックデック','ディップス','プッシュアップ','腕立て','ダンベルフライ','クロスオーバー','インクラインプレス'], c:'chest'},
+  // 背中
+  {p:['ラットプルダウン','プルダウン','ローイング','シーテッドロー','ベントオーバーロー','ロー','ロウ','懸垂','チンニング','プルアップ','デッドリフト','バックエクステンション','ハイパーエクステンション','プルオーバー','ラットプル'], c:'back'},
+  // 有酸素
+  {p:['ランニング','トレッドミル','バイク','エアロ','クロストレーナー','ウォーキング','有酸素'], c:'cardio'},
+];
+
+function guessCategoryByName(name){
+  for(const g of CATEGORY_PATTERNS){
+    for(const pat of g.p){
+      if(name.includes(pat)) return g.c;
+    }
+  }
+  return null;
+}
+
 function getExerciseCategorySync(name){
   if(EXERCISE_CATEGORY_PRESET[name]) return EXERCISE_CATEGORY_PRESET[name];
-  return customExerciseCategories[name] ||
-    (()=>{ try{ return JSON.parse(localStorage.getItem('wt_categories')||'{}')[name]; }catch(e){} })() ||
-    'default';
+  const cached = customExerciseCategories[name] ||
+    (()=>{ try{ return JSON.parse(localStorage.getItem('wt_categories')||'{}')[name]; }catch(e){} })();
+  // defaultのキャッシュは信用せず、名前から推定し直す
+  if(cached && cached !== 'default') return cached;
+  return guessCategoryByName(name) || 'default';
 }
 
 // --- EXERCISE CATEGORY ICONS ---
@@ -1134,7 +1166,18 @@ function judgeProgression(name, sessionsAsc){
 }
 
 async function detectExerciseCategory(name){
-  if(customExerciseCategories[name]) return customExerciseCategories[name];
+  if(customExerciseCategories[name] && customExerciseCategories[name] !== 'default') return customExerciseCategories[name];
+  // まず名前パターンで判定（API不要・確実）
+  const guessed = guessCategoryByName(name);
+  if(guessed){
+    customExerciseCategories[name] = guessed;
+    try{
+      const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+      saved[name] = guessed;
+      localStorage.setItem('wt_categories', JSON.stringify(saved));
+    }catch(e){}
+    return guessed;
+  }
   try{
     const res = await fetch(SUPABASE_URL+'/functions/v1/ai-advice',{
       method:'POST',
@@ -1150,13 +1193,14 @@ async function detectExerciseCategory(name){
     const data = await res.json();
     const text = (data.content?.[0]?.text||'').toLowerCase().trim();
     const cat = ['chest','back','shoulder','leg','arm','core','cardio'].find(c=>text.includes(c)) || 'default';
-    customExerciseCategories[name] = cat;
-    // localStorageにも保存
-    try{
-      const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
-      saved[name] = cat;
-      localStorage.setItem('wt_categories', JSON.stringify(saved));
-    }catch(e){}
+    if(cat !== 'default'){
+      customExerciseCategories[name] = cat;
+      try{
+        const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+        saved[name] = cat;
+        localStorage.setItem('wt_categories', JSON.stringify(saved));
+      }catch(e){}
+    }
     return cat;
   }catch(e){
     return 'default';
@@ -1222,6 +1266,13 @@ function toggleDatePicker(){
 }
 
 function init(){
+  // 過去に'default'で確定してしまったカテゴリを消して再判定させる
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_categories')||'{}');
+    let dirty = false;
+    Object.keys(saved).forEach(k=>{ if(saved[k]==='default'){ delete saved[k]; dirty = true; } });
+    if(dirty) localStorage.setItem('wt_categories', JSON.stringify(saved));
+  }catch(e){}
   // 前回のメールアドレスを復元
   try{
     const savedEmail = localStorage.getItem('wt_auth_email');
