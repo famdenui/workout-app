@@ -659,6 +659,8 @@ let timerSec = 0;
 let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'120', 10); // 設定値（恒久）
 let sessionDur = timerDur; // 現在のタイマー1回分の実効値（±ボタンでの一時調整を含む）
 let timerRunning = false;
+let timerEndAt = 0;      // 終了予定時刻(ms)。バックグラウンド復帰時はここから残り時間を再計算する
+let lastBeepSec = -1;    // カウントダウン音の重複防止
 let timerExIdx = -1;
 let timerSetIdx = -1;
 let currentFilter = 'all';
@@ -1802,11 +1804,13 @@ function startTimer(ei, si){
   timerSetIdx = si;
   sessionDur = timerDur; // 設定値から開始（前回の一時調整はリセット）
   timerSec = sessionDur;
+  timerEndAt = Date.now() + sessionDur*1000;
+  lastBeepSec = -1;
   timerRunning = true;
   document.getElementById('timerScreen').classList.add('on');
   updateTimerUI();
   startAudioKeepAlive(); // オーディオセッション維持
-  timerInterval = setInterval(tickTimer, 1000);
+  timerInterval = setInterval(tickTimer, 250);
 }
 
 // Web Audio APIでビープ音を生成
@@ -1855,7 +1859,10 @@ function reviveAudio(){
   }
 }
 document.addEventListener('visibilitychange', ()=>{
-  if(!document.hidden) reviveAudio();
+  if(!document.hidden){
+    reviveAudio();
+    syncTimerFromClock(); // 裏で止まっていた分を実時間で補正
+  }
 });
 // 復帰後の最初のタップでも再アーム（iOSはユーザー操作起点だと確実に復旧できる）
 document.addEventListener('touchstart', ()=>{
@@ -1948,25 +1955,46 @@ function initAudio(){
   getAudioCtx();
 }
 
+// 残り秒数は常に終了時刻から逆算する（iOSがバックグラウンドでJSを止めても復帰時にズレない）
+function remainingSec(){
+  return Math.ceil((timerEndAt - Date.now())/1000);
+}
+
+function finishTimer(silent){
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerSec = 0;
+  const rt = document.getElementById('ringTime');
+  if(rt){ rt.textContent = 'GO!'; rt.className = 'ring-time done'; }
+  const rs = document.getElementById('ringSub');
+  if(rs) rs.textContent = silent ? 'インターバルは終了しています' : 'インターバル終了';
+  // バックグラウンド中に終わっていた場合は今さら鳴らさない
+  if(!silent) playEndBuzzer();
+  hideFloatingTimer();
+  setTimeout(()=>{ skipTimer(); }, 2500);
+}
+
 function tickTimer(){
-  timerSec--;
-  if(timerSec <= 0){
-    clearInterval(timerInterval);
-    timerRunning = false;
-    const rt = document.getElementById('ringTime');
-    rt.textContent = 'GO!';
-    rt.className = 'ring-time done';
-    document.getElementById('ringSub').textContent = 'インターバル終了';
-    // 終了音（オシレーターによるビブラートブザー）
-    playEndBuzzer();
-    hideFloatingTimer();
-    setTimeout(()=>{ skipTimer(); }, 2500);
-    return;
-  }
-  // 残り3秒カウントダウン音
-  if(timerSec <= 3){
+  if(!timerRunning) return;
+  const remain = remainingSec();
+  if(remain <= 0){ finishTimer(false); return; }
+  if(remain === timerSec) return; // 秒が変わった時だけ更新
+  timerSec = remain;
+  if(timerSec <= 3 && timerSec !== lastBeepSec){
+    lastBeepSec = timerSec;
     beep(523, 0.25, 0.25);
   }
+  updateTimerUI();
+  updateFloatingTimer();
+}
+
+// 他アプリから戻った時に実時間へ合わせ直す
+function syncTimerFromClock(){
+  if(!timerRunning) return;
+  const remain = remainingSec();
+  if(remain <= 0){ finishTimer(true); return; }
+  timerSec = remain;
+  lastBeepSec = -1;
   updateTimerUI();
   updateFloatingTimer();
 }
@@ -2013,15 +2041,22 @@ function updateTimerUI(){
 function adjustDur(delta){
   // この回だけの一時調整。設定のデフォルト値（timerDur）は変更しない
   sessionDur = Math.max(10, Math.min(300, sessionDur+delta));
-  if(timerRunning) timerSec = Math.max(1, Math.min(timerSec+delta, sessionDur));
+  if(timerRunning){
+    let remain = Math.max(1, Math.min(remainingSec()+delta, sessionDur));
+    timerSec = remain;
+    timerEndAt = Date.now() + remain*1000;
+    lastBeepSec = -1;
+  }
   updateTimerUI();
 }
 
 function resetTimer(){
   timerSec = sessionDur;
+  timerEndAt = Date.now() + sessionDur*1000;
+  lastBeepSec = -1;
   if(!timerRunning){
     timerRunning = true;
-    timerInterval = setInterval(tickTimer, 1000);
+    timerInterval = setInterval(tickTimer, 250);
   }
   updateTimerUI();
 }
