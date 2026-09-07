@@ -483,6 +483,11 @@ document.head.appendChild(link);
       <button class="date-toggle" id="dateToggleBtn" onclick="toggleDatePicker()">過去の日付を入力</button>
     </div>
     <div class="gym-chips" id="gymChips"></div>
+    <div id="editBanner" style="display:none;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:rgba(255,149,0,0.09);border:0.5px solid rgba(255,149,0,0.3);border-radius:10px">
+      <span style="display:inline-flex;width:15px;height:15px;color:#ff9500;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></span>
+      <span id="editBannerText" style="font-size:12px;font-weight:600;color:#c77700;flex:1"></span>
+      <span onclick="cancelEdit()" style="font-size:11px;color:#ff3b30;font-weight:600;cursor:pointer;touch-action:manipulation">編集をやめる</span>
+    </div>
     <div id="sessionTimeBar" onclick="resetSessionStart()" style="display:none;align-items:center;gap:8px;margin-bottom:10px;padding:11px 13px;background:rgba(0,199,190,0.08);border:0.5px solid rgba(0,199,190,0.25);border-radius:11px;cursor:pointer;touch-action:manipulation">
       <span style="display:inline-flex;width:17px;height:17px;color:#00c7be;flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>
       <span id="sessionTimeText" style="font-size:15px;font-weight:600;color:#00a89f;font-family:var(--mono);flex:1"></span>
@@ -497,6 +502,10 @@ document.head.appendChild(link);
     <div class="add-ex-row" id="addExRow" onclick="focusInput()" style="display:none">
       <div class="add-ex-ico"><span style="display:inline-flex;width:16px;height:16px;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="var(--text4)" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span></i></div>
       <span>種目を追加...</span>
+    </div>
+    <div id="memoWrap" style="display:none;margin-top:12px">
+      <textarea id="sessionMemo" oninput="syncMemoState()" placeholder="メモ（フォームの気づき、体調、混雑状況など）" rows="2"
+        style="width:100%;padding:11px 12px;border-radius:11px;border:0.5px solid var(--border2);background:var(--surface);font-size:13px;font-family:var(--font);color:var(--text);resize:vertical;line-height:1.6"></textarea>
     </div>
     <button class="save-btn" id="saveBtn" onclick="confirmSave()">完了・保存</button>
   </div>
@@ -658,6 +667,8 @@ let timerInterval = null;
 let timerSec = 0;
 let timerDur = parseInt(localStorage.getItem('wt_timer_dur')||'120', 10); // 設定値（恒久）
 let sessionDur = timerDur; // 現在のタイマー1回分の実効値（±ボタンでの一時調整を含む）
+let editingSessionId = null;   // 編集中の過去セッションID（新規記録時はnull）
+let sessionMemo = '';          // 今回のトレーニングのメモ
 let timerRunning = false;
 let timerEndAt = 0;      // 終了予定時刻(ms)。バックグラウンド復帰時はここから残り時間を再計算する
 let lastBeepSec = -1;    // カウントダウン音の重複防止
@@ -856,7 +867,7 @@ async function syncFromSupabase(){
     if(!res.ok) throw new Error('fetch failed');
     const rows = await res.json();
     const sessions = rows.map(r=>({
-      id: r.id, date: r.date, datetime: r.datetime, startTs: r.start_ts, endTs: r.end_ts, gym: r.gym, exercises: r.exercises
+      id: r.id, date: r.date, datetime: r.datetime, startTs: r.start_ts, endTs: r.end_ts, memo: r.memo, gym: r.gym, exercises: r.exercises
     }));
     const newJson = JSON.stringify(sessions);
     const changed = newJson !== (localStorage.getItem('wt_v2')||'[]');
@@ -890,6 +901,7 @@ async function saveSession(session){
         user_id: currentUserId(),
         start_ts: session.startTs || null,
         end_ts: session.endTs || null,
+        memo: session.memo || null,
         gym: session.gym,
         exercises: session.exercises
       })
@@ -906,6 +918,39 @@ async function saveSession(session){
 }
 
 // DB削除
+// 既存セッションを上書き更新
+async function updateSession(session){
+  await ensureFreshToken();
+  // localStorage側を差し替え
+  try{
+    const local = JSON.parse(localStorage.getItem('wt_v2')||'[]');
+    const idx = local.findIndex(s=>String(s.id)===String(session.id));
+    if(idx >= 0) local[idx] = session; else local.push(session);
+    localStorage.setItem('wt_v2', JSON.stringify(local));
+  }catch(e){}
+  // Supabase側を更新
+  try{
+    const res = await fetch(SUPABASE_URL+'/rest/v1/sessions?id=eq.'+session.id, {
+      method: 'PATCH',
+      headers: sbHeaders(),
+      body: JSON.stringify({
+        date: session.date,
+        datetime: session.datetime,
+        start_ts: session.startTs || null,
+        end_ts: session.endTs || null,
+        memo: session.memo || null,
+        gym: session.gym,
+        exercises: session.exercises
+      })
+    });
+    if(!res.ok) showToast('クラウド側の更新に失敗しました');
+    return res.ok;
+  }catch(e){
+    console.warn('Supabase update failed', e);
+    return false;
+  }
+}
+
 async function deleteSession(id){
   // localStorageから削除
   try{
@@ -1627,6 +1672,15 @@ function removeExercise(idx){
   renderRec();
 }
 
+// 種目の並べ替え（画面は新しい順に並ぶため、上=後にやる種目）
+function moveExercise(ei, dir){
+  const to = ei + dir;
+  if(to < 0 || to >= exercises.length) return;
+  const [moved] = exercises.splice(ei, 1);
+  exercises.splice(to, 0, moved);
+  renderRec();
+}
+
 // 自重トグル切り替え
 function toggleBodyweight(ei){
   exercises[ei].bodyweight = !exercises[ei].bodyweight;
@@ -1758,6 +1812,27 @@ function completeSet(ei, si){
 
 function renderRec(){
   setTimeout(updateSessionTimeBar, 0);
+  setTimeout(()=>{
+    // メモ欄は種目が1つ以上ある時だけ表示
+    const mw = document.getElementById('memoWrap');
+    const mt = document.getElementById('sessionMemo');
+    if(mw) mw.style.display = exercises.length ? 'block' : 'none';
+    if(mt && mt.value !== sessionMemo) mt.value = sessionMemo || '';
+    // 編集中バナー
+    const eb = document.getElementById('editBanner');
+    const et = document.getElementById('editBannerText');
+    if(eb){
+      if(editingSessionId){
+        eb.style.display = 'flex';
+        if(et) et.textContent = fmtDate(selectedDate)+' の記録を編集中';
+      } else {
+        eb.style.display = 'none';
+      }
+    }
+    // 保存ボタンの文言
+    const sb = document.getElementById('saveBtn');
+    if(sb) sb.textContent = editingSessionId ? '変更を保存' : '完了・保存';
+  }, 0);
   const list = document.getElementById('exList');
   const addRow = document.getElementById('addExRow');
   const saveBtn = document.getElementById('saveBtn');
@@ -1835,6 +1910,10 @@ function renderRec(){
           <div class="ex-meta">
             <div class="ex-name">${ex.name}</div>
             <div class="ex-prev">${prevStr}${progBadge}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;margin-right:5px;flex-shrink:0">
+            <button onclick="moveExercise(${ei},-1)" ${ei===0?'disabled':''} style="width:22px;height:17px;padding:0;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg);color:${ei===0?'var(--text5)':'var(--text3)'};font-size:9px;line-height:1;cursor:pointer;touch-action:manipulation">▲</button>
+            <button onclick="moveExercise(${ei},1)" ${ei===exercises.length-1?'disabled':''} style="width:22px;height:17px;padding:0;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg);color:${ei===exercises.length-1?'var(--text5)':'var(--text3)'};font-size:9px;line-height:1;cursor:pointer;touch-action:manipulation">▼</button>
           </div>
           <button class="bw-toggle${ex.bodyweight?' on':''}" onclick="toggleBodyweight(${ei})">自重</button>
           <button class="ex-del" onclick="removeExercise(${ei})"><span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></i></button>
@@ -2152,9 +2231,10 @@ function updateFloatingTimer(){
 // --- SAVE ---
 function confirmSave(){
   if(!exercises.length) return;
-  const exNames = exercises.map(e=>e.name).join('、');
-  document.getElementById('modalSub').textContent =
-    gymLabel(currentGym)+'（'+GYMS.find(g=>g.id===currentGym)?.label+' ジム）のトレーニング '+exercises.length+'種目を保存します。';
+  const gymName = GYMS.find(g=>g.id===currentGym)?.label||'';
+  document.getElementById('modalSub').textContent = editingSessionId
+    ? fmtDate(selectedDate)+'（'+gymName+'）の記録を '+exercises.length+'種目に更新します。'
+    : gymLabel(currentGym)+'（'+gymName+' ジム）のトレーニング '+exercises.length+'種目を保存します。';
   document.getElementById('modal').classList.add('on');
 }
 
@@ -2164,38 +2244,111 @@ function closeModal(){
 
 async function doSave(){
   closeModal();
-  const now2 = new Date();
-  // 選択日付が今日なら現在のタイムスタンプ、過去日付ならその日の12:00のタイムスタンプ
-  let sessionTimestamp;
-  if(selectedDate === today()){
-    sessionTimestamp = now2.getTime();
-  } else {
+  const isEditing = !!editingSessionId;
+  const memoEl = document.getElementById('sessionMemo');
+  const memo = memoEl ? (memoEl.value||'').trim() : sessionMemo;
+
+  // 画面は新しい順（unshift）なので、保存時は実施順に戻す
+  const exPayload = exercises.slice().reverse().map(e=>({
+    name: e.name,
+    bodyweight: !!e.bodyweight,
+    sets: e.sets.map(s=>({weight:s.weight, reps:s.reps}))
+  }));
+
+  let ok;
+  if(isEditing){
+    const prev = getDB().find(s=>String(s.id)===String(editingSessionId)) || {};
     const [y,m,d] = selectedDate.split('-').map(Number);
-    sessionTimestamp = new Date(y, m-1, d, 12, 0, 0).getTime();
+    const session = {
+      ...prev,
+      id: editingSessionId,
+      date: selectedDate,
+      datetime: (prev.date===selectedDate && prev.datetime) ? prev.datetime : new Date(y, m-1, d, 12, 0, 0).getTime(),
+      memo: memo,
+      gym: currentGym,
+      exercises: exPayload
+    };
+    ok = await updateSession(session);
+  } else {
+    const now2 = new Date();
+    let sessionTimestamp;
+    if(selectedDate === today()){
+      sessionTimestamp = now2.getTime();
+    } else {
+      const [y,m,d] = selectedDate.split('-').map(Number);
+      sessionTimestamp = new Date(y, m-1, d, 12, 0, 0).getTime();
+    }
+    const session = {
+      id: Date.now(),
+      date: selectedDate,
+      datetime: sessionTimestamp,
+      startTs: parseInt(localStorage.getItem('wt_session_start')||'0',10) || null,
+      endTs: Date.now(),
+      memo: memo,
+      gym: currentGym,
+      exercises: exPayload
+    };
+    ok = await saveSession(session);
+    localStorage.removeItem('wt_session_start');
   }
-  const session = {
-    id: Date.now(),
-    date: selectedDate,
-    datetime: sessionTimestamp,
-    startTs: parseInt(localStorage.getItem('wt_session_start')||'0',10) || null,
-    endTs: Date.now(),
-    gym: currentGym,
-    exercises: exercises.slice().reverse().map(e=>({
-      name: e.name,
-      bodyweight: !!e.bodyweight,
-      sets: e.sets.map(s=>({weight:s.weight, reps:s.reps}))
-    }))
-  };
-  const ok = await saveSession(session);
+
+  editingSessionId = null;
+  sessionMemo = '';
   exercises = [];
-  localStorage.removeItem('wt_session_start');
   updateSessionTimeBar();
   selectedDate = today();
   updateDateDisplay();
   renderRec();
-  showToast(ok ? '保存しました！' : '保存しました（オフライン）');
-  showScreen('dash', document.getElementById('nav-dash'));
-  renderDash();
+  showToast(isEditing ? '更新しました' : (ok ? '保存しました！' : '保存しました（オフライン）'));
+  if(isEditing){
+    showScreen('hist', document.getElementById('nav-hist'));
+    renderHist();
+  } else {
+    showScreen('dash', document.getElementById('nav-dash'));
+    renderDash();
+  }
+}
+
+// 過去の記録を記録画面に読み込んで編集する
+function editSession(id){
+  const s = getDB().find(x=>String(x.id)===String(id));
+  if(!s){ showToast('記録が見つかりません'); return; }
+  if(exercises.length && !editingSessionId){
+    if(!confirm('入力中の記録があります。\n破棄して編集を開始しますか？')) return;
+  }
+  editingSessionId = s.id;
+  selectedDate = s.date;
+  currentGym = s.gym;
+  sessionMemo = s.memo || '';
+  // 保存は実施順、画面は新しい順なので反転して戻す
+  exercises = s.exercises.slice().reverse().map(e=>({
+    name: e.name,
+    bodyweight: !!e.bodyweight,
+    sets: e.sets.map(st=>({weight:st.weight, reps:st.reps, done:true, preset:false}))
+  }));
+  updateDateDisplay();
+  renderGymChips();
+  renderRec();
+  showScreen('rec', document.getElementById('nav-rec'));
+  window.scrollTo(0,0);
+  showToast('編集モードで開きました');
+}
+
+function syncMemoState(){
+  const el = document.getElementById('sessionMemo');
+  if(el) sessionMemo = el.value;
+}
+
+function cancelEdit(){
+  if(!confirm('編集を破棄しますか？')) return;
+  editingSessionId = null;
+  sessionMemo = '';
+  exercises = [];
+  selectedDate = today();
+  updateDateDisplay();
+  renderRec();
+  showScreen('hist', document.getElementById('nav-hist'));
+  renderHist();
 }
 
 // --- DASHBOARD ---
@@ -2492,7 +2645,7 @@ function buildPromptFromDB(){
       const totalVol = sets.reduce((a,st)=>a+st.weight*st.reps,0);
       return e.name+'['+setStr+'] 総量:'+totalVol+'kg';
     }).join(', ');
-    return s.date+' ['+gym+']: '+exList2;
+    return s.date+' ['+gym+']: '+exList2 + (s.memo ? ' ※メモ: '+s.memo : '');
   }).join('\n');
 
   // 種目別推移（比較スコープ準拠）
@@ -2599,7 +2752,11 @@ async function renderHist(){
         </div>
         <div class="hist-tags">${tags}${more}</div>
         <div class="hist-detail">${detail}
-          <button class="hist-del" onclick="event.stopPropagation();confirmDelete('${s.id}','${s.date}','${gym?.label||s.gym}',${s.exercises.length})">このトレーニングを削除</button>
+          ${s.memo ? `<div style="margin-top:9px;padding:9px 11px;background:var(--bg);border-radius:9px;font-size:12px;color:var(--text3);line-height:1.6;white-space:pre-wrap">${s.memo}</div>` : ''}
+          <div style="display:flex;gap:7px;margin-top:11px">
+            <button onclick="event.stopPropagation();editSession('${s.id}')" style="flex:1;padding:10px;border-radius:9px;border:0.5px solid var(--border2);background:var(--bg);color:var(--accent);font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">編集する</button>
+            <button onclick="event.stopPropagation();confirmDelete('${s.id}','${s.date}','${gym?.label||s.gym}',${s.exercises.length})" style="flex:1;padding:10px;border-radius:9px;border:0.5px solid var(--border2);background:var(--bg);color:#ff3b30;font-size:12px;font-weight:600;font-family:var(--font);cursor:pointer;touch-action:manipulation">削除する</button>
+          </div>
         </div>
       </div>`;
   }).join('');
