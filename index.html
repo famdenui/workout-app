@@ -446,13 +446,14 @@ document.head.appendChild(link);
       <div class="settings-section-title">インターバルタイマー</div>
       <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="font-size:13px;color:var(--text)">インターバル時間</div>
+          <div style="font-size:13px;color:var(--text)">既定のインターバル</div>
           <div style="display:flex;align-items:center;gap:8px">
             <button class="num-ctrl-btn" onclick="settingsAdjustDur(-10)" style="width:32px;height:32px;font-size:18px">−</button>
             <div id="settingsDurLbl" style="font-size:16px;font-weight:600;color:var(--text);font-family:var(--mono);min-width:56px;text-align:center">120秒</div>
             <button class="num-ctrl-btn" onclick="settingsAdjustDur(10)" style="width:32px;height:32px;font-size:18px">＋</button>
           </div>
         </div>
+        <div style="font-size:10px;color:var(--text4);line-height:1.6;margin-bottom:10px">種目ごとに自動設定されます（高重量150秒 / 中重量120秒 / アイソレーション90秒 / 補助45秒）。ここは判定できない種目に使う既定値です。最終セット後はレストなし。</div>
         <div style="font-size:11px;color:var(--text4);margin-bottom:10px">プリセット（タップで設定）</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap" id="durPresets"></div>
       </div>
@@ -1049,6 +1050,52 @@ const EXERCISE_CATEGORY_PRESET = {
   'アブドミナル':'core','ロータリートルソー':'core','トーソローテーション':'core',
   'スミスマシン':'default',
 };
+// ============ レスト時間の自動設定 ============
+// コンパウンド高重量150s / 中重量120s / アイソレーション90s / 補助45s
+const REST_BY_TIER = { compound_heavy:150, compound_mid:120, isolation:90, accessory:45 };
+
+const REST_PATTERNS = [
+  // 補助・体幹（軽い種目）※先に評価
+  {p:['クランチ','シットアップ','プランク','アブドミナル','トーソ','ロータリー','アブローラー','レッグレイズ','腹筋',
+      'バックエクステンション','ハイパーエクステンション','アダクション','アブダクション','カーフレイズ',
+      'ランニング','トレッドミル','バイク','エアロ','クロストレーナー','ウォーキング','有酸素'], t:'accessory'},
+  // コンパウンド高重量
+  {p:['スクワット','デッドリフト','ベンチプレス','レッグプレス','懸垂','チンニング','プルアップ','ハックスクワット','ランジ','ヒップスラスト'], t:'compound_heavy'},
+  // コンパウンド中重量
+  {p:['チェストプレス','ショルダープレス','オーバーヘッドプレス','ラットプルダウン','プルダウン','ローイング','シーテッドロー','ベントオーバーロー','ロー','ロウ','ディップス','プッシュアップ','腕立て','プルオーバー'], t:'compound_mid'},
+  // アイソレーション
+  {p:['カール','プレスダウン','プッシュダウン','キックバック','トライセプス','フレンチプレス','スカルクラッシャー',
+      'フライ','ペックデック','クロスオーバー','レイズ','リアデルト','デルトイド','シュラッグ',
+      'レッグエクステンション','レッグカール'], t:'isolation'},
+];
+
+function getExerciseTier(name){
+  for(const g of REST_PATTERNS){
+    for(const pat of g.p){ if(name.includes(pat)) return g.t; }
+  }
+  return null;
+}
+
+// 種目ごとのレスト秒数（個別記憶 > タイプ別自動 > 全体設定）
+function getRestFor(name){
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_rest_by_ex')||'{}');
+    if(saved[name]) return saved[name];
+  }catch(e){}
+  const tier = getExerciseTier(name);
+  if(tier) return REST_BY_TIER[tier];
+  return timerDur;
+}
+
+// タイマーで調整した秒数をその種目の値として記憶する
+function saveRestFor(name, sec){
+  try{
+    const saved = JSON.parse(localStorage.getItem('wt_rest_by_ex')||'{}');
+    saved[name] = sec;
+    localStorage.setItem('wt_rest_by_ex', JSON.stringify(saved));
+  }catch(e){}
+}
+
 // 名前からカテゴリを推定（AIに頼らないオフライン判定）
 // 上から順に評価するので、より限定的なパターンを先に置くこと
 const CATEGORY_PATTERNS = [
@@ -1801,11 +1848,17 @@ function completeSet(ei, si){
   }
   updateSessionTimeBar();
   initAudio(); // iOSのAudioContext初期化（ユーザー操作直後に呼ぶ必要がある）
-  const set = exercises[ei].sets[si];
+  const ex = exercises[ei];
+  const set = ex.sets[si];
   set.done = !set.done;
   if(set.done){
     set.preset = false;
-    startTimer(ei, si);
+    const isLastSet = si === ex.sets.length - 1;
+    if(isLastSet){
+      showToast(ex.name+' 完了');  // 最終セットはレスト不要
+    } else {
+      startTimer(ei, si);
+    }
   }
   renderRec();
 }
@@ -1849,10 +1902,8 @@ function renderRec(){
 
   list.innerHTML = exercises.map((ex,ei)=>{
     const prev = getPrevSets(ex.name);
-    const prevStr = prev ? prev.map(s=>{
-      if(ex.bodyweight) return bwLabel(s.weight)+'×'+s.reps;
-      return s.weight+'kg×'+s.reps;
-    }).join(' · ') : '前回記録なし';
+    // 前回値は各セット入力欄のプリセットに使うため取得は継続（種目名の下には表示しない）
+    const restLabel = getRestFor(ex.name)+'秒レスト';
     // double progressionステータス（同一比較スコープの履歴から判定）
     const compareKey = getCompareKey(ex.name, currentGym);
     const histSessions = getDB()
@@ -1909,7 +1960,7 @@ function renderRec(){
           <div class="ex-ico" style="background:${ getIconWithColor(ex.name).lightColor }">${ getIconWithColor(ex.name).icon }</div>
           <div class="ex-meta">
             <div class="ex-name">${ex.name}</div>
-            <div class="ex-prev">${prevStr}${progBadge}</div>
+            <div class="ex-prev">${progBadge || '<span style="color:var(--text5)">'+restLabel+'</span>'}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;margin-right:5px;flex-shrink:0">
             <button onclick="moveExercise(${ei},-1)" ${ei===0?'disabled':''} style="width:22px;height:17px;padding:0;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg);color:${ei===0?'var(--text5)':'var(--text3)'};font-size:9px;line-height:1;cursor:pointer;touch-action:manipulation">▲</button>
@@ -1932,7 +1983,8 @@ function startTimer(ei, si){
   if(timerRunning) clearInterval(timerInterval);
   timerExIdx = ei;
   timerSetIdx = si;
-  sessionDur = timerDur; // 設定値から開始（前回の一時調整はリセット）
+  // 種目ごとのレスト時間を採用（個別記憶 > タイプ別自動 > 全体設定）
+  sessionDur = exercises[ei] ? getRestFor(exercises[ei].name) : timerDur;
   timerSec = sessionDur;
   timerEndAt = Date.now() + sessionDur*1000;
   lastBeepSec = -1;
@@ -2171,6 +2223,9 @@ function updateTimerUI(){
 function adjustDur(delta){
   // この回だけの一時調整。設定のデフォルト値（timerDur）は変更しない
   sessionDur = Math.max(10, Math.min(300, sessionDur+delta));
+  // この種目のレスト時間として記憶（次回以降も同じ長さで開始する）
+  const tex = exercises[timerExIdx];
+  if(tex) saveRestFor(tex.name, sessionDur);
   if(timerRunning){
     let remain = Math.max(1, Math.min(remainingSec()+delta, sessionDur));
     timerSec = remain;
