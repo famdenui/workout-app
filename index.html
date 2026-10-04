@@ -443,6 +443,19 @@ document.head.appendChild(link);
     </div>
 
     <div class="settings-section">
+      <div class="settings-section-title">加重ルール</div>
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text3);line-height:1.8">
+          ・全セット <strong>12rep×3set</strong> が揃うまで加重を推奨しません<br>
+          ・加重幅の上限は <strong>脚 +5kg / 上半身 +2.5kg</strong>（ダンベルは +2kg）<br>
+          ・加重推奨は <strong>1回のトレーニングで1種目まで</strong><br>
+          ・種目カードの鍵ボタンで<strong>据え置き</strong>にすると推奨を止められます
+        </div>
+        <div id="lockedList" style="margin-top:11px"></div>
+      </div>
+    </div>
+
+    <div class="settings-section">
       <div class="settings-section-title">インターバルタイマー</div>
       <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -1206,19 +1219,37 @@ function getRepTarget(name){
     const saved = JSON.parse(localStorage.getItem('wt_rep_targets')||'{}');
     if(saved[name]) return saved[name];
   }catch(e){}
-  return {reps: 10, sets: 3};
+  return {reps: 12, sets: 3};  // 12rep×3set が全セット揃うまで加重を推奨しない
 }
 
-// 増量提案幅: machine/barbell +2.5kg、dumbbell +2kg
+// 増量提案幅の上限: 脚 +5kg / 上半身 +2.5kg（ダンベルは +2kg）
 function getIncrement(name){
-  return getEquipmentType(name)==='dumbbell' ? 2 : 2.5;
+  if(getEquipmentType(name)==='dumbbell') return 2;
+  return getExerciseCategorySync(name)==='leg' ? 5 : 2.5;
+}
+
+// ===== 据え置きロック（ケガ中の種目は推奨自体を止める）=====
+function getLockedExercises(){
+  try{ return JSON.parse(localStorage.getItem('wt_locked_ex')||'[]'); }catch(e){ return []; }
+}
+function isLocked(name){ return getLockedExercises().includes(name); }
+function toggleLock(ei){
+  const name = exercises[ei].name;
+  const list = getLockedExercises();
+  const idx = list.indexOf(name);
+  if(idx >= 0){ list.splice(idx,1); showToast(name+' のロックを解除しました'); }
+  else { list.push(name); showToast(name+' を据え置きにしました'); }
+  localStorage.setItem('wt_locked_ex', JSON.stringify(list));
+  renderRec();
 }
 
 // 判定: 同一比較スコープ内のセッション履歴（昇順）を受け取りステータスを返す
 // 戻り値: {status: 'increase'|'progress'|'stagnant', label, detail}
 function judgeProgression(name, sessionsAsc){
   const target = getRepTarget(name);
-  if(!sessionsAsc || sessionsAsc.length < 2) return {status:'progress', label:'進行中', detail:'データ蓄積中'};
+  // 据え置きロック中は加重推奨を一切出さない
+  if(isLocked(name)) return {status:'hold', label:'据え置き', detail:'加重推奨を停止中', streak:0};
+  if(!sessionsAsc || sessionsAsc.length < 2) return {status:'progress', label:'進行中', detail:'データ蓄積中', streak:0};
 
   // 各セッションの「主重量」（最頻セット重量）と全セット目標達成判定
   const recs = sessionsAsc.map(s=>{
@@ -1232,6 +1263,12 @@ function judgeProgression(name, sessionsAsc){
   const last = recs[recs.length-1];
   const prev = recs[recs.length-2];
 
+  // 現在の重量が何回続いているか（長く待っている種目を優先するために使う）
+  let streak = 1;
+  for(let i=recs.length-2; i>=0; i--){
+    if(recs[i].maxW === last.maxW) streak++; else break;
+  }
+
   // 直近2回連続で全セット目標rep達成 → 増量推奨
   if(last.allHit && prev.allHit && last.maxW === prev.maxW){
     // 全セッションで重量0＝純粋な自重種目は加重かレップ目標引き上げを提案
@@ -1240,7 +1277,7 @@ function judgeProgression(name, sessionsAsc){
     const detail = assisted ? 'アシストを'+Math.min(5, Math.abs(last.maxW))+'kg減らす'
                  : allZero ? '加重かレップ目標増を検討'
                  : '+'+getIncrement(name)+'kg で次へ';
-    return {status:'increase', label:'増量推奨', detail};
+    return {status:'increase', label:'増量推奨', detail, streak};
   }
 
   // 目標rep達成済みかつ同一重量が3回以上継続 → 停滞
@@ -1249,12 +1286,12 @@ function judgeProgression(name, sessionsAsc){
     const sameW = last3.every(r=>r.maxW === last3[0].maxW);
     const anyHit = last3.some(r=>r.allHit);
     if(sameW && anyHit){
-      return {status:'stagnant', label:'停滞', detail:'同一重量が'+last3.length+'回継続'};
+      return {status:'stagnant', label:'停滞', detail:'同一重量が'+streak+'回継続', streak};
     }
   }
 
   // 目標rep未達で同一重量 → 進行中
-  return {status:'progress', label:'進行中', detail:'目標 '+target.reps+'rep×'+target.sets+'setへ'};
+  return {status:'progress', label:'進行中', detail:'目標 '+target.reps+'rep×'+target.sets+'setへ', streak};
 }
 
 async function detectExerciseCategory(name){
@@ -1529,7 +1566,8 @@ function getTodayRecommendations(gymId){
         .sort((a,b)=>new Date(a.date)-new Date(b.date));
       if(hist.length>=2){
         const prog = judgeProgression(c.name, hist);
-        if(prog.status==='increase'){ score += 50; reasons.unshift('増量推奨'); }
+        if(prog.status==='hold'){ reasons.unshift('据え置き中'); }
+        else if(prog.status==='increase'){ score += 50; reasons.unshift('増量推奨'); }
         else if(prog.status==='stagnant'){ score += 25; reasons.push('停滞打破を'); }
       }
 
@@ -1900,20 +1938,36 @@ function renderRec(){
   saveBtn.disabled = false;
   addRow.style.display = 'flex';
 
-  list.innerHTML = exercises.map((ex,ei)=>{
-    const prev = getPrevSets(ex.name);
-    // 前回値は各セット入力欄のプリセットに使うため取得は継続（種目名の下には表示しない）
-    const restLabel = getRestFor(ex.name)+'秒レスト';
-    // double progressionステータス（同一比較スコープの履歴から判定）
+  // 先に全種目のステータスを算出し、増量推奨は1セッション1種目だけに絞る
+  const db = getDB();
+  const progList = exercises.map(ex=>{
     const compareKey = getCompareKey(ex.name, currentGym);
-    const histSessions = getDB()
+    const histSessions = db
       .filter(s=>getCompareKey(ex.name, s.gym)===compareKey)
       .map(s=>{ const e2=s.exercises.find(x=>x.name===ex.name); return e2?{date:s.date, sets:e2.sets}:null; })
       .filter(Boolean)
       .sort((a,b)=>new Date(a.date)-new Date(b.date));
-    const prog = judgeProgression(ex.name, histSessions);
-    const progColors = {increase:'#34c759', progress:'#8e8e93', stagnant:'#ff9500'};
-    const progBadge = histSessions.length>=2
+    return {prog: judgeProgression(ex.name, histSessions), count: histSessions.length};
+  });
+  // 増量推奨が複数あれば、同じ重量で最も長く待っている1種目だけを採用
+  let increaseIdx = -1;
+  progList.forEach((p,i)=>{
+    if(p.prog.status !== 'increase') return;
+    if(increaseIdx === -1 || (p.prog.streak||0) > (progList[increaseIdx].prog.streak||0)) increaseIdx = i;
+  });
+
+  list.innerHTML = exercises.map((ex,ei)=>{
+    const prev = getPrevSets(ex.name);
+    // 前回値は各セット入力欄のプリセットに使うため取得は継続（種目名の下には表示しない）
+    const restLabel = getRestFor(ex.name)+'秒レスト';
+    const histSessions = {length: progList[ei].count};
+    let prog = progList[ei].prog;
+    // 今回の加重枠を使わない種目は「次回候補」に降格
+    if(prog.status === 'increase' && ei !== increaseIdx){
+      prog = {status:'queued', label:'次回候補', detail:'加重は1回1種目まで'};
+    }
+    const progColors = {increase:'#34c759', progress:'#8e8e93', stagnant:'#ff9500', hold:'#007aff', queued:'#8e8e93'};
+    const progBadge = (histSessions.length>=2 || prog.status==='hold')
       ? `<span style="font-size:9px;font-weight:700;color:${progColors[prog.status]};margin-left:6px;padding:1px 7px;border-radius:99px;background:${progColors[prog.status]}18;border:0.5px solid ${progColors[prog.status]}40">${prog.label}</span>`
       : '';
     const allDone = ex.sets.every(s=>s.done);
@@ -1960,12 +2014,18 @@ function renderRec(){
           <div class="ex-ico" style="background:${ getIconWithColor(ex.name).lightColor }">${ getIconWithColor(ex.name).icon }</div>
           <div class="ex-meta">
             <div class="ex-name">${ex.name}</div>
-            <div class="ex-prev">${progBadge || '<span style="color:var(--text5)">'+restLabel+'</span>'}</div>
+            <div class="ex-prev">${progBadge
+              ? progBadge + (prog.detail ? `<span style="color:var(--text4);margin-left:5px;font-size:10px">${prog.detail}</span>` : '')
+              : '<span style="color:var(--text5)">'+restLabel+'</span>'}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;margin-right:5px;flex-shrink:0">
             <button onclick="moveExercise(${ei},-1)" ${ei===0?'disabled':''} style="width:22px;height:17px;padding:0;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg);color:${ei===0?'var(--text5)':'var(--text3)'};font-size:9px;line-height:1;cursor:pointer;touch-action:manipulation">▲</button>
             <button onclick="moveExercise(${ei},1)" ${ei===exercises.length-1?'disabled':''} style="width:22px;height:17px;padding:0;border-radius:5px;border:0.5px solid var(--border2);background:var(--bg);color:${ei===exercises.length-1?'var(--text5)':'var(--text3)'};font-size:9px;line-height:1;cursor:pointer;touch-action:manipulation">▼</button>
           </div>
+          <button onclick="toggleLock(${ei})" title="据え置きロック"
+            style="width:26px;height:24px;padding:0;margin-right:4px;flex-shrink:0;border-radius:7px;border:0.5px solid ${isLocked(ex.name)?'#007aff':'var(--border2)'};background:${isLocked(ex.name)?'#007aff':'var(--bg)'};color:${isLocked(ex.name)?'#fff':'var(--text4)'};cursor:pointer;touch-action:manipulation;display:inline-flex;align-items:center;justify-content:center">
+            <span style="display:inline-flex;width:12px;height:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="${isLocked(ex.name)?'M7 11V7a5 5 0 0 1 10 0v4':'M7 11V7a5 5 0 0 1 9.9-1'}"/></svg></span>
+          </button>
           <button class="bw-toggle${ex.bodyweight?' on':''}" onclick="toggleBodyweight(${ei})">自重</button>
           <button class="ex-del" onclick="removeExercise(${ei})"><span style="display:inline-flex;width:1em;height:1em;flex-shrink:0;vertical-align:middle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></i></button>
         </div>
@@ -2618,6 +2678,8 @@ function setFilter(id){
 function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, sessionDetail, gymExSummary){
   const stagnantNames = stagnant.map(e=>e.name).join('、')||'なし';
   const balanceSummary = bodyParts ? Object.entries(bodyParts).map(([k,b])=>b.label+':'+b.sets+'セット').join(', ') : '';
+  const lockedList = (typeof getLockedExercises === 'function') ? getLockedExercises() : [];
+  const lockedNote = lockedList.length ? '- 現在据え置き中の種目: '+lockedList.join('、') : '- 現在据え置き中の種目: なし';
   const latestSession = sessionDetail.split('\n')[0] || 'なし';
   const pastSessions = sessionDetail.split('\n').slice(1).join('\n') || 'なし';
   return `あなたは経験豊富なパーソナルトレーナーです。私が今日行ったトレーニングについて、過去の経過を踏まえた具体的なフィードバックをください。
@@ -2629,6 +2691,12 @@ function buildDetailPrompt(all, exList, stagnant, bodyParts, repTrendSummary, se
 - 除外: 腕の肥大を目的とした直接種目（カール等）は優先しない。ラテラルレイズは提案しない
 - 目指す体型: 全身バランスの良い細め筋肉質。肩幅を広げることは望まない（ラテラルレイズ等で三角筋中部を大きくしない）。姿勢の改善を重視
 
+【加重に関する絶対ルール（提案時に必ず守ること）】
+- 全セットで12rep×3set が揃うまで加重を提案しない。揃っていない種目は「レップを積む」提案にとどめる
+- 加重幅の上限は 脚 +5kg / 上半身 +2.5kg（ダンベルは +2kg）。これを超える提案はしない
+- 1回のトレーニングで加重を勧めるのは1種目まで。複数候補があれば最も長く同じ重量が続いている1種目だけを選ぶ
+- 「据え置き中」と記載された種目には、加重を一切提案しない（同じ重量を維持する前提で助言する）
+${lockedNote}
 【記録の見方】
 - 「アシスト30kg」= アシストマシンで30kg補助を受けた状態。数値が小さくなるほど自力に近づき進歩を意味する（30kg→20kg は進歩）
 - 「自重」= 補助も加重もなし
@@ -2897,6 +2965,28 @@ function copyUserId(){
   navigator.clipboard.writeText(id).then(()=>showToast('ユーザーIDをコピーしました')).catch(()=>{});
 }
 
+function renderLockedSettings(){
+  const el = document.getElementById('lockedList');
+  if(!el) return;
+  const list = getLockedExercises();
+  if(!list.length){
+    el.innerHTML = '<div style="font-size:11px;color:var(--text4)">据え置き中の種目はありません</div>';
+    return;
+  }
+  el.innerHTML = '<div style="font-size:11px;color:var(--text4);margin-bottom:6px">据え置き中</div>'+
+    list.map(n=>'<div style="display:flex;align-items:center;gap:7px;padding:7px 9px;background:rgba(0,122,255,0.07);border:0.5px solid rgba(0,122,255,0.25);border-radius:8px;margin-bottom:5px">'+
+      '<span style="flex:1;font-size:12px;color:var(--text)">'+n+'</span>'+
+      '<span onclick="unlockFromSettings(\''+n.replace(/'/g,"\\'")+'\')" style="font-size:11px;color:#ff3b30;font-weight:600;cursor:pointer;touch-action:manipulation">解除</span>'+
+    '</div>').join('');
+}
+
+function unlockFromSettings(name){
+  const list = getLockedExercises().filter(n=>n!==name);
+  localStorage.setItem('wt_locked_ex', JSON.stringify(list));
+  renderLockedSettings();
+  showToast(name+' のロックを解除しました');
+}
+
 function renderDurSettings(){
   const lbl = document.getElementById('settingsDurLbl');
   if(lbl) lbl.textContent = timerDur+'秒';
@@ -3139,7 +3229,7 @@ function showScreen(id, btn){
   btn.classList.add('on');
   if(id==='dash'){ syncFromSupabase().then(r=>{ if(r&&r.changed) renderDash(); }); renderDash(); }
   if(id==='hist'){ syncFromSupabase().then(r=>{ if(r&&r.changed) renderHist(); }); renderHist(); }
-  if(id==='settings'){ renderGymSettings(); renderDurSettings(); renderAuthSettings(); }
+  if(id==='settings'){ renderGymSettings(); renderDurSettings(); renderAuthSettings(); renderLockedSettings(); }
 }
 
 // --- TOAST ---
